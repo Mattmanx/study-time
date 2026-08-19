@@ -19,6 +19,7 @@
 - **Test runner path:** `/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc`. There is no Node on this machine — do not write tests that need it.
 - **All 35 problems are verified against the teacher's answer keys.** Do not "correct" a problem's data against your own arithmetic without re-reading the key PDFs in `geometry-10/reference/`.
 - Every task ends with `./tests/run.sh` passing (from Task 2 onward) and a commit.
+- **Red phase:** `jsc`'s `load()` aborts on a missing file, so before the first failing run, create the module as an empty file (`: > geometry-10/src/<name>.js`). Otherwise the run fails with `Could not open file` and never executes the test body — which proves the file is absent, not that the behaviour is unimplemented.
 
 ---
 
@@ -346,6 +347,13 @@ done('checker');
 - [ ] **Step 3: Run test to verify it fails**
 
 Run: `cd geometry-10 && ./tests/run.sh`
+First create the module as an empty file, so `load()` has something to open:
+
+```bash
+: > geometry-10/src/checker.js
+```
+
+Then run: `cd geometry-10 && ./tests/run.sh`
 Expected: FAIL — `Can't find variable: checkAnswer`.
 
 - [ ] **Step 4: Write the implementation**
@@ -645,7 +653,16 @@ done('problems');
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd geometry-10 && ./tests/run.sh`
+First create the module as an empty file, so `load()` has something to open:
+
+```bash
+: > geometry-10/src/problems.js
+```
+
+Then run: `cd geometry-10 && ./tests/run.sh`
 Expected: FAIL — `Can't find variable: PROBLEMS`.
+
+An empty file still proves nothing is implemented. Without it, `load('src/problems.js')` throws `Could not open file` before the test body runs, which is a missing-file error rather than a missing-implementation one.
 
 - [ ] **Step 3: Write the walker and the equation data**
 
@@ -1197,7 +1214,16 @@ done('generators');
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd geometry-10 && ./tests/run.sh`
+First create the module as an empty file, so `load()` has something to open:
+
+```bash
+: > geometry-10/src/generators.js
+```
+
+Then run: `cd geometry-10 && ./tests/run.sh`
 Expected: FAIL — `Can't find variable: makeRng`.
+
+An empty file still proves nothing is implemented. Without it, `load('src/generators.js')` throws `Could not open file` before the test body runs, which is a missing-file error rather than a missing-implementation one.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -1610,7 +1636,16 @@ done('hints');
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd geometry-10 && ./tests/run.sh`
+First create the module as an empty file, so `load()` has something to open:
+
+```bash
+: > geometry-10/src/hints.js
+```
+
+Then run: `cd geometry-10 && ./tests/run.sh`
 Expected: FAIL — `Can't find variable: hintFor`.
+
+An empty file still proves nothing is implemented. Without it, `load('src/hints.js')` throws `Could not open file` before the test body runs, which is a missing-file error rather than a missing-implementation one.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -1822,7 +1857,16 @@ done('storage');
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd geometry-10 && ./tests/run.sh`
+First create the module as an empty file, so `load()` has something to open:
+
+```bash
+: > geometry-10/src/storage.js
+```
+
+Then run: `cd geometry-10 && ./tests/run.sh`
 Expected: FAIL — `Can't find variable: parseProgress`.
+
+An empty file still proves nothing is implemented. Without it, `load('src/storage.js')` throws `Could not open file` before the test body runs, which is a missing-file error rather than a missing-implementation one.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -2051,7 +2095,16 @@ done('session');
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd geometry-10 && ./tests/run.sh`
+First create the module as an empty file, so `load()` has something to open:
+
+```bash
+: > geometry-10/src/session.js
+```
+
+Then run: `cd geometry-10 && ./tests/run.sh`
 Expected: FAIL — `Can't find variable: createDrill`.
+
+An empty file still proves nothing is implemented. Without it, `load('src/session.js')` throws `Could not open file` before the test body runs, which is a missing-file error rather than a missing-implementation one.
 
 - [ ] **Step 3: Write the implementation**
 
