@@ -1,0 +1,6 @@
+# Scanned schoolwork and teacher-provided materials.
+# These carry student names in handwriting and are not ours to redistribute.
+# This repository is public — do not remove this rule.
+**/reference/
+
+.DS_Store
