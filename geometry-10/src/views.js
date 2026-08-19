@@ -15,6 +15,29 @@
     'exponent': 'Exponents'
   };
 
+  // What the answer should look like, shown greyed in the empty box.
+  var SHAPE = {
+    'pair': '(3, 0)', 'fraction': '3/4', 'radical': '5\u221a10',
+    'decimal2': '0.00', 'op': '+5', 'signs': '+,\u2212'
+  };
+  function placeholderFor(spec) { return SHAPE[spec.kind] || ''; }
+
+  // "Type an answer first" is only true of an empty box. If something was
+  // typed and could not be read, say what shape was expected instead.
+  var SHAPE_HELP = {
+    'pair': 'Give it as an ordered pair, like (3, 0).',
+    'fraction': 'Write it as a fraction, like 3/4.',
+    'radical': 'Write it in exact form, like 5\u221a10.',
+    'decimal2': 'Give a decimal to the hundredths place, like 5.92.',
+    'op': 'Write the operation, like +5 or \u00f73.',
+    'signs': 'Give the two signs, like +,\u2212.',
+    'int': 'That does not look like a number.'
+  };
+  function malformedMessage(spec, typed) {
+    if (String(typed).trim() === '') return 'Type an answer first.';
+    return SHAPE_HELP[spec.kind] || 'That answer could not be read.';
+  }
+
   function escapeHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
                     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -25,9 +48,11 @@
   function renderTemplate(template, blanks, activeName, filled) {
     return template.replace(/\{(\w+)\}/g, function (_, name) {
       if (name === activeName) {
+        var ph = placeholderFor(blankSpec(blanks[name]));
         return '<input id="answer" type="text" inputmode="text" ' +
                'spellcheck="false" autocomplete="off" autocorrect="off" ' +
-               'autocapitalize="off" aria-label="Answer">';
+               'autocapitalize="off" aria-label="Answer"' +
+               (ph ? ' placeholder="' + ph + '"' : '') + '>';
       }
       if (filled && filled.hasOwnProperty(name)) {
         var cls = filled[name].shown ? 'shown' : 'filled';
@@ -169,7 +194,8 @@
       renderQuiz('Right value — now simplify it completely.', 'bad'); return;
     }
     if (result.status === 'malformed') {
-      renderQuiz('Type an answer first.', 'bad'); return;
+      var spec = blankSpec(cur.problem.steps[stepIndex].blanks[name]);
+      renderQuiz(malformedMessage(spec, text), 'bad'); return;
     }
     if (result.status === 'correct' || result.status === 'revealed') {
       filledByStep[stepIndex] = filledByStep[stepIndex] || {};
