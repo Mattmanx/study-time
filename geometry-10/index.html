@@ -52,6 +52,15 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
 #feedback { min-height: 3rem; }
 #feedback.bad { color: var(--no); }
 #feedback.good { color: var(--ok); }
+#figure { margin-bottom: 1rem; }
+#figure:empty { margin-bottom: 0; }
+#figure svg { max-width: 100%; height: auto; }
+.grid { stroke: currentColor; stroke-width: .5; opacity: .18; }
+.axis { stroke: currentColor; stroke-width: 1.5; opacity: .8; }
+.plot { stroke: var(--ok); stroke-width: 2.5; }
+.hi { stroke: var(--no); stroke-width: 4; opacity: .8; }
+.ring { fill: none; stroke: var(--no); stroke-width: 3; }
+.quad { fill: var(--no); opacity: .15; }
 </style>
 </head>
 <body>
@@ -1279,10 +1288,6 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
     });
   }
 
-  // Replaced by the real implementation in Task 10. Until then, figures
-  // render as nothing rather than throwing.
-  function renderFigure() { return ''; }
-
   var session = null, progress = null, filledByStep = {};
 
   function loadProgress() {
@@ -1463,6 +1468,77 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
     return String(a.value);
   }
 
+  // A -6..6 grid drawn in a 260x260 box. Both figures share it so the two
+  // question types look like the same coordinate plane.
+  var GRID = 6, PAD = 14, SPAN = 260;
+  function gx(x) { return PAD + ((x + GRID) / (2 * GRID)) * (SPAN - 2 * PAD); }
+  function gy(y) { return PAD + ((GRID - y) / (2 * GRID)) * (SPAN - 2 * PAD); }
+
+  function gridSvg() {
+    var parts = [], i;
+    for (i = -GRID; i <= GRID; i++) {
+      parts.push('<line x1="' + gx(i) + '" y1="' + gy(-GRID) +
+                 '" x2="' + gx(i) + '" y2="' + gy(GRID) + '" class="grid"/>');
+      parts.push('<line x1="' + gx(-GRID) + '" y1="' + gy(i) +
+                 '" x2="' + gx(GRID) + '" y2="' + gy(i) + '" class="grid"/>');
+    }
+    parts.push('<line x1="' + gx(-GRID) + '" y1="' + gy(0) +
+               '" x2="' + gx(GRID) + '" y2="' + gy(0) + '" class="axis"/>');
+    parts.push('<line x1="' + gx(0) + '" y1="' + gy(-GRID) +
+               '" x2="' + gx(0) + '" y2="' + gy(GRID) + '" class="axis"/>');
+    return parts.join('');
+  }
+
+  var QUAD_CENTRE = {
+    'I': [3, 3], 'II': [-3, 3], 'III': [-3, -3], 'IV': [3, -3]
+  };
+
+  function highlight(target) {
+    if (target === 'origin') {
+      return '<circle cx="' + gx(0) + '" cy="' + gy(0) + '" r="7" class="ring"/>';
+    }
+    if (target === 'x-axis') {
+      return '<line x1="' + gx(-GRID) + '" y1="' + gy(0) + '" x2="' + gx(GRID) +
+             '" y2="' + gy(0) + '" class="hi"/>';
+    }
+    if (target === 'y-axis') {
+      return '<line x1="' + gx(0) + '" y1="' + gy(-GRID) + '" x2="' + gx(0) +
+             '" y2="' + gy(GRID) + '" class="hi"/>';
+    }
+    var c = QUAD_CENTRE[target];
+    if (!c) return '';
+    var x0 = gx(Math.min(0, c[0] * 2)), x1 = gx(Math.max(0, c[0] * 2));
+    var y0 = gy(Math.max(0, c[1] * 2)), y1 = gy(Math.min(0, c[1] * 2));
+    return '<rect x="' + x0 + '" y="' + y0 + '" width="' + (x1 - x0) +
+           '" height="' + (y1 - y0) + '" class="quad"/>';
+  }
+
+  function lineSvg(xInt, yInt) {
+    // The line through (xInt,0) and (0,yInt), extended to the grid edge.
+    // slope = -yInt/xInt, and y = yInt + slope*x.
+    var slope = -yInt / xInt;
+    function yAt(x) { return yInt + slope * x; }
+    var pts = [];
+    var left = -GRID, right = GRID;
+    var yl = yAt(left), yr = yAt(right);
+    // Clip to the box so a steep line does not run off the figure.
+    if (Math.abs(yl) > GRID) { left = (Math.sign(yl) * GRID - yInt) / slope; yl = yAt(left); }
+    if (Math.abs(yr) > GRID) { right = (Math.sign(yr) * GRID - yInt) / slope; yr = yAt(right); }
+    pts.push('<line x1="' + gx(left) + '" y1="' + gy(yl) + '" x2="' + gx(right) +
+             '" y2="' + gy(yr) + '" class="plot"/>');
+    return pts.join('');
+  }
+
+  function renderFigure(figure) {
+    if (!figure) return '';
+    var inner = gridSvg();
+    if (figure.shape === 'plane') inner = highlight(figure.target) + inner;
+    if (figure.shape === 'line') inner += lineSvg(figure.xInt, figure.yInt);
+    return '<svg viewBox="0 0 ' + SPAN + ' ' + SPAN + '" width="' + SPAN +
+           '" height="' + SPAN + '" role="img" aria-label="Coordinate plane">' +
+           inner + '</svg>';
+  }
+
   function startApp() {
     el('start-mock').onclick = function () { begin(createMockTest()); };
     el('back-to-menu').onclick = function (e) { e.preventDefault(); renderMenu(); };
@@ -1472,6 +1548,7 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
 
   globalThis.renderTemplate = renderTemplate;
   globalThis.startApp = startApp;
+  globalThis.renderFigure = renderFigure;
 })();
 
 document.addEventListener('DOMContentLoaded', function () { startApp(); });

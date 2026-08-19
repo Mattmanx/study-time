@@ -46,3 +46,12 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
 #feedback { min-height: 3rem; }
 #feedback.bad { color: var(--no); }
 #feedback.good { color: var(--ok); }
+#figure { margin-bottom: 1rem; }
+#figure:empty { margin-bottom: 0; }
+#figure svg { max-width: 100%; height: auto; }
+.grid { stroke: currentColor; stroke-width: .5; opacity: .18; }
+.axis { stroke: currentColor; stroke-width: 1.5; opacity: .8; }
+.plot { stroke: var(--ok); stroke-width: 2.5; }
+.hi { stroke: var(--no); stroke-width: 4; opacity: .8; }
+.ring { fill: none; stroke: var(--no); stroke-width: 3; }
+.quad { fill: var(--no); opacity: .15; }
