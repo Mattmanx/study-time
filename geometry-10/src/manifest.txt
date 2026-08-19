@@ -2,3 +2,4 @@
 checker.js
 problems.js
 generators.js
+hints.js
