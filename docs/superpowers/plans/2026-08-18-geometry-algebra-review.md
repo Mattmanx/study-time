@@ -1615,6 +1615,26 @@ var p9 = find('p2-9');
 var h3 = hintFor(ctx(p9, 0, 'a', '-1'));
 check('negative-term fires', has(h3, 'add'), true);
 check('negative-term silent when right', hintFor(ctx(p9, 0, 'a', '3')), '');
+// It must also fire on a GENERATED equation, whose step reads
+// '...together - add 2a to both sides' in lower case.
+load('src/generators.js');
+var genFired = false, genChecked = 0;
+for (var gs = 1; gs <= 200 && !genFired; gs++) {
+  var grng = makeRng(gs);
+  for (var gn = 0; gn < 40; gn++) {
+    var gp = generate('equation', grng);
+    var gm = gp.steps[0].say.match(/add (\d+)([a-z]) to both sides/i);
+    if (!gm) continue;
+    genChecked += 1;
+    var want = gp.steps[0].blanks[Object.keys(gp.steps[0].blanks)[0]];
+    var wrong = want - 2 * parseInt(gm[1], 10);
+    if (hintFor(ctx(gp, 0, Object.keys(gp.steps[0].blanks)[0], String(wrong)))) {
+      genFired = true; break;
+    }
+  }
+}
+check('found generated move-term steps', genChecked > 0, true);
+check('negative-term fires on generated too', genFired, true);
 
 // --- 4. bad cross-cancel (P1 #12 and P2 #12, both wrong on the first pass)
 var p12 = find('p1-12');
@@ -1705,7 +1725,9 @@ An empty file still proves nothing is implemented. Without it, `load('src/hints.
   // 3. Moving a negative variable term. Subtracting -2x instead of adding it
   //    turns a coefficient of a+|b| into a-|b|.
   function negativeTermAcross(c) {
-    var m = c.step.say.match(/Add (\d+)([a-z]) to both sides/);
+    // Case-insensitive: authored steps open with 'Add 2x…', generated ones
+    // read '…together — add 2a to both sides'.
+    var m = c.step.say.match(/add (\d+)([a-z]) to both sides/i);
     if (!m) return '';
     var moved = parseInt(m[1], 10);
     var want = num(correctValue(c.step, c.blankName));
