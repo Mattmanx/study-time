@@ -4,3 +4,4 @@ problems.js
 generators.js
 hints.js
 storage.js
+session.js
