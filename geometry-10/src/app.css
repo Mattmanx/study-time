@@ -1,0 +1,46 @@
+:root { color-scheme: light dark; --ok: #1a7f37; --no: #b3261e; }
+body {
+  font: 16px/1.6 system-ui, -apple-system, sans-serif;
+  max-width: 40rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem;
+}
+h1 { font-size: 1.5rem; }
+h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
+     opacity: .6; margin-top: 2rem; }
+.crumb { font-size: .875rem; }
+.crumb a { color: inherit; opacity: .7; }
+.topics { list-style: none; padding: 0; }
+.topics button {
+  display: flex; justify-content: space-between; align-items: center;
+  width: 100%; padding: .75rem 1rem; margin-bottom: .5rem; font: inherit;
+  text-align: left; background: none; color: inherit;
+  border: 1px solid currentColor; border-radius: .5rem; cursor: pointer;
+}
+.topics button:hover { background: rgba(128,128,128,.12); }
+.bar { width: 5rem; height: .4rem; border-radius: .2rem;
+       background: rgba(128,128,128,.3); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--ok); }
+.primary {
+  font: inherit; padding: .7rem 1.4rem; border-radius: .5rem;
+  border: 1px solid currentColor; background: none; color: inherit;
+  cursor: pointer;
+}
+.prompt { font-size: 1.6rem; margin: .5rem 0 1.5rem; }
+.note { font-size: .8rem; padding: .35rem .6rem; border-radius: .3rem;
+        background: rgba(128,128,128,.15); display: inline-block; }
+#steps { list-style: none; padding: 0; }
+#steps li { margin-bottom: 1.1rem; opacity: .35; }
+#steps li.active, #steps li.past { opacity: 1; }
+.say { font-size: .9rem; opacity: .75; }
+.line { font-size: 1.25rem; }
+.line input {
+  font: inherit; width: 5rem; padding: .1rem .35rem; text-align: center;
+  border: 0; border-bottom: 2px solid currentColor; background: none;
+  color: inherit; border-radius: 0;
+}
+.line input:focus { outline: none; border-bottom-color: var(--ok); }
+.line .filled { color: var(--ok); font-weight: 600; }
+.line .shown { color: var(--no); font-weight: 600; }
+.line .todo { opacity: .4; }
+#feedback { min-height: 3rem; }
+#feedback.bad { color: var(--no); }
+#feedback.good { color: var(--ok); }

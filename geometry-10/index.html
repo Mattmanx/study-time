@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Geometry — Test #1: Algebra Review</title>
+<style>:root { color-scheme: light dark; --ok: #1a7f37; --no: #b3261e; }
+body {
+  font: 16px/1.6 system-ui, -apple-system, sans-serif;
+  max-width: 40rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem;
+}
+h1 { font-size: 1.5rem; }
+h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
+     opacity: .6; margin-top: 2rem; }
+.crumb { font-size: .875rem; }
+.crumb a { color: inherit; opacity: .7; }
+.topics { list-style: none; padding: 0; }
+.topics button {
+  display: flex; justify-content: space-between; align-items: center;
+  width: 100%; padding: .75rem 1rem; margin-bottom: .5rem; font: inherit;
+  text-align: left; background: none; color: inherit;
+  border: 1px solid currentColor; border-radius: .5rem; cursor: pointer;
+}
+.topics button:hover { background: rgba(128,128,128,.12); }
+.bar { width: 5rem; height: .4rem; border-radius: .2rem;
+       background: rgba(128,128,128,.3); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--ok); }
+.primary {
+  font: inherit; padding: .7rem 1.4rem; border-radius: .5rem;
+  border: 1px solid currentColor; background: none; color: inherit;
+  cursor: pointer;
+}
+.prompt { font-size: 1.6rem; margin: .5rem 0 1.5rem; }
+.note { font-size: .8rem; padding: .35rem .6rem; border-radius: .3rem;
+        background: rgba(128,128,128,.15); display: inline-block; }
+#steps { list-style: none; padding: 0; }
+#steps li { margin-bottom: 1.1rem; opacity: .35; }
+#steps li.active, #steps li.past { opacity: 1; }
+.say { font-size: .9rem; opacity: .75; }
+.line { font-size: 1.25rem; }
+.line input {
+  font: inherit; width: 5rem; padding: .1rem .35rem; text-align: center;
+  border: 0; border-bottom: 2px solid currentColor; background: none;
+  color: inherit; border-radius: 0;
+}
+.line input:focus { outline: none; border-bottom-color: var(--ok); }
+.line .filled { color: var(--ok); font-weight: 600; }
+.line .shown { color: var(--no); font-weight: 600; }
+.line .todo { opacity: .4; }
+#feedback { min-height: 3rem; }
+#feedback.bad { color: var(--no); }
+#feedback.good { color: var(--ok); }
+</style>
+</head>
+<body>
+<main id="menu-screen">
+  <p class="crumb"><a href="../index.html">← All topics</a></p>
+  <h1>Test #1: Algebra Review</h1>
+  <h2>Drill one topic</h2>
+  <ul id="topic-list" class="topics"></ul>
+  <h2>Or take a practice test</h2>
+  <button id="start-mock" class="primary">Start practice test</button>
+  <section id="trouble" hidden>
+    <h2>Worth reviewing</h2>
+    <ul id="trouble-list"></ul>
+  </section>
+</main>
+
+<main id="quiz-screen" hidden>
+  <p class="crumb"><a href="#" id="back-to-menu">← Menu</a></p>
+  <p id="progress"></p>
+  <p id="calc-note" class="note" hidden></p>
+  <div id="figure"></div>
+  <p id="prompt" class="prompt"></p>
+  <ol id="steps"></ol>
+  <p id="feedback" aria-live="polite"></p>
+</main>
+
+<main id="done-screen" hidden>
+  <h1 id="done-title"></h1>
+  <p id="done-score"></p>
+  <section>
+    <h2>Review these</h2>
+    <ul id="review-list"></ul>
+  </section>
+  <button id="again" class="primary">Back to menu</button>
+</main>
+<script>// Answer comparison. One rule per answer kind. No DOM access.
+(function () {
+  // Students type the unicode minus from a worksheet as often as a hyphen.
+  function normalize(text) {
+    return String(text == null ? '' : text)
+      .replace(/−/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function gcd(a, b) {
+    a = Math.abs(a); b = Math.abs(b);
+    while (b) { var t = b; b = a % b; a = t; }
+    return a || 1;
+  }
+
+  function parseInteger(text) {
+    var s = normalize(text);
+    return /^[+-]?\d+$/.test(s) ? parseInt(s, 10) : null;
+  }
+
+  function parseFraction(text) {
+    var s = normalize(text);
+    var m = s.match(/^([+-]?\d+)\s*\/\s*([+-]?\d+)$/);
+    if (m) {
+      var den = parseInt(m[2], 10);
+      if (den === 0) return null;
+      return { num: parseInt(m[1], 10), den: den };
+    }
+    var whole = parseInteger(s);
+    return whole === null ? null : { num: whole, den: 1 };
+  }
+
+  function isReduced(f) {
+    return gcd(f.num, f.den) === 1 && f.den > 0;
+  }
+
+  function sameValue(a, b) { return a.num * b.den === b.num * a.den; }
+
+  function parsePair(text) {
+    var s = normalize(text).replace(/^\(|\)$/g, '');
+    var parts = s.split(',');
+    if (parts.length !== 2) return null;
+    var x = parseInteger(parts[0]), y = parseInteger(parts[1]);
+    return (x === null || y === null) ? null : { x: x, y: y };
+  }
+
+  // Type 7 demands exactly two decimal places -- "15.8" is not an answer
+  // rounded to hundredths, it is an answer rounded to tenths.
+  function checkDecimal2(text, spec) {
+    var s = normalize(text);
+    if (!/^[+-]?\d+(\.\d+)?$/.test(s)) return { status: 'malformed' };
+    if (!/^[+-]?\d+\.\d{2}$/.test(s)) return { status: 'needs-hundredths' };
+    return { status: parseFloat(s) === spec.value ? 'correct' : 'wrong' };
+  }
+
+  function parseRadical(text) {
+    var s = normalize(text).toLowerCase()
+      .replace(/√/g, ' sqrt ')
+      .replace(/\bsqrt\b/g, ' sqrt ')
+      .replace(/(\d)\s*r\s*(\d)/g, '$1 sqrt $2')
+      .replace(/^\s*r\s*(\d)/, ' sqrt $1')
+      .replace(/\s+/g, ' ')
+      .trim();
+    var m = s.match(/^(\d*)\s*sqrt\s*(\d+)$/);
+    if (!m) return null;
+    return { coef: m[1] === '' ? 1 : parseInt(m[1], 10), rad: parseInt(m[2], 10) };
+  }
+
+  function checkRadical(text, spec) {
+    var s = normalize(text);
+    // A bare decimal means the calculator button was used -- explicitly banned.
+    if (/^[+-]?\d+\.\d+$/.test(s)) return { status: 'needs-exact' };
+    var r = parseRadical(s);
+    if (r === null) return { status: 'malformed' };
+    return { status: (r.coef === spec.coef && r.rad === spec.rad) ? 'correct' : 'wrong' };
+  }
+
+  function checkSigns(text, spec) {
+    var s = normalize(text).replace(/[()\s]/g, '');
+    var parts = s.split(',');
+    if (parts.length !== 2 || !/^[+-]$/.test(parts[0]) || !/^[+-]$/.test(parts[1])) {
+      return { status: 'malformed' };
+    }
+    return { status: (parts[0] === spec.x && parts[1] === spec.y) ? 'correct' : 'wrong' };
+  }
+
+  function checkLabel(text, spec) {
+    function key(v) { return normalize(v).toLowerCase().replace(/[\s-]+/g, ''); }
+    var s = key(text);
+    if (s === '') return { status: 'malformed' };
+    return { status: s === key(spec.value) ? 'correct' : 'wrong' };
+  }
+
+  function checkAnswer(text, spec) {
+    if (spec.kind === 'int') {
+      var n = parseInteger(text);
+      if (n === null) return { status: 'malformed' };
+      return { status: n === spec.value ? 'correct' : 'wrong' };
+    }
+    if (spec.kind === 'fraction') {
+      var f = parseFraction(text);
+      if (f === null) return { status: 'malformed' };
+      if (!sameValue(f, spec)) return { status: 'wrong' };
+      return { status: isReduced(f) ? 'correct' : 'unreduced' };
+    }
+    if (spec.kind === 'pair') {
+      var p = parsePair(text);
+      if (p === null) return { status: 'malformed' };
+      return { status: (p.x === spec.x && p.y === spec.y) ? 'correct' : 'wrong' };
+    }
+    if (spec.kind === 'decimal2') return checkDecimal2(text, spec);
+    if (spec.kind === 'radical') return checkRadical(text, spec);
+    if (spec.kind === 'signs') return checkSigns(text, spec);
+    if (spec.kind === 'label') return checkLabel(text, spec);
+    throw new Error('unknown answer kind: ' + spec.kind);
+  }
+
+  // A step blank declares a plain value; its grading rule is inferred from
+  // the shape of that value, so problem data stays free of type tags.
+  function blankSpec(value) {
+    if (typeof value === 'number') return { kind: 'int', value: value };
+    var s = normalize(value);
+    if (s.indexOf(',') !== -1) {
+      var pr = parsePair(s);
+      if (pr) return { kind: 'pair', x: pr.x, y: pr.y };
+      var q = s.replace(/[()\s]/g, '').split(',');
+      if (q.length === 2 && /^[+-]$/.test(q[0]) && /^[+-]$/.test(q[1])) {
+        return { kind: 'signs', x: q[0], y: q[1] };
+      }
+      return { kind: 'label', value: s };
+    }
+    var r = parseRadical(s);
+    if (r) return { kind: 'radical', coef: r.coef, rad: r.rad };
+    if (s.indexOf('/') !== -1) {
+      var f = parseFraction(s);
+      if (f) return { kind: 'fraction', num: f.num, den: f.den };
+    }
+    if (/^[+-]?\d+\.\d+$/.test(s)) return { kind: 'decimal2', value: parseFloat(s) };
+    if (/^[+-]?\d+$/.test(s)) return { kind: 'int', value: parseInt(s, 10) };
+    return { kind: 'label', value: s };
+  }
+
+  globalThis.checkAnswer = checkAnswer;
+  globalThis.gcd = gcd;
+  globalThis.parseFraction = parseFraction;
+  globalThis.blankSpec = blankSpec;
+})();
+
+// The study guide problems, as data. Every answer here is verified against
+// the teacher's answer keys -- do not "fix" one against your own arithmetic
+// without re-reading the key PDFs in reference/.
+(function () {
+  // A chain is trustworthy only if its last step lands exactly on the
+  // declared answer. Anything else means the transcription drifted.
+  function walkProblem(p) {
+    if (!p.steps || p.steps.length === 0) {
+      return { ok: false, error: 'no steps' };
+    }
+    var last = p.steps[p.steps.length - 1];
+    var keys = Object.keys(last.blanks);
+    if (keys.length !== 1) {
+      return { ok: false, error: 'final step must have exactly one blank, has ' + keys.length };
+    }
+    var final = last.blanks[keys[0]];
+    var result = checkAnswer(String(final), p.answer);
+    if (result.status !== 'correct') {
+      return { ok: false, error: 'final blank ' + final + ' is ' + result.status };
+    }
+    return { ok: true, error: '' };
+  }
+
+  // int and decimal2 answers verify against a bare number; every other kind
+  // needs the whole spec, since its value lives in several fields.
+  function verifyArg(answer) {
+    return (answer.kind === 'int' || answer.kind === 'decimal2') ? answer.value : answer;
+  }
+
+  var PROBLEMS = [
+    // ---- Type 4: multi-step linear equations (Part I #4-9, Part II #2-9)
+    { id: 'p1-4', type: 'equation', source: 'P1 #4', prompt: '−9p − 1 = −145',
+      answer: { kind: 'int', value: 16 },
+      verify: function (p) { return -9 * p - 1 === -145; },
+      steps: [
+        { say: 'Add 1 to both sides:', template: '−9p = {a}', blanks: { a: -144 } },
+        { say: 'Divide both sides by −9:', template: 'p = {b}', blanks: { b: 16 } }
+      ] },
+
+    { id: 'p1-5', type: 'equation', source: 'P1 #5', prompt: '−10 + x/14 = −11',
+      answer: { kind: 'int', value: -14 },
+      verify: function (x) { return -10 + x / 14 === -11; },
+      steps: [
+        { say: 'Add 10 to both sides:', template: 'x/14 = {a}', blanks: { a: -1 } },
+        { say: 'Multiply both sides by 14:', template: 'x = {b}', blanks: { b: -14 } }
+      ] },
+
+    { id: 'p1-6', type: 'equation', source: 'P1 #6', prompt: '−(x − 5) = −7',
+      answer: { kind: 'int', value: 12 },
+      verify: function (x) { return -(x - 5) === -7; },
+      steps: [
+        { say: 'Distribute the −1:', template: '−x + {a} = −7', blanks: { a: 5 } },
+        { say: 'Subtract 5 from both sides:', template: '−x = {b}', blanks: { b: -12 } },
+        { say: 'Divide both sides by −1:', template: 'x = {c}', blanks: { c: 12 } }
+      ] },
+
+    { id: 'p1-7', type: 'equation', source: 'P1 #7', prompt: '2(n − 7) = −14',
+      answer: { kind: 'int', value: 0 },
+      verify: function (n) { return 2 * (n - 7) === -14; },
+      steps: [
+        { say: 'Distribute the 2:', template: '2n − {a} = −14', blanks: { a: 14 } },
+        { say: 'Add 14 to both sides:', template: '2n = {b}', blanks: { b: 0 } },
+        { say: 'Divide both sides by 2:', template: 'n = {c}', blanks: { c: 0 } }
+      ] },
+
+    { id: 'p1-8', type: 'equation', source: 'P1 #8', prompt: '2n + 3 = −4 + 9n',
+      answer: { kind: 'int', value: 1 },
+      verify: function (n) { return 2 * n + 3 === -4 + 9 * n; },
+      steps: [
+        { say: 'Subtract 9n from both sides:', template: '{a}n + 3 = −4', blanks: { a: -7 } },
+        { say: 'Subtract 3 from both sides:', template: '−7n = {b}', blanks: { b: -7 } },
+        { say: 'Divide both sides by −7:', template: 'n = {c}', blanks: { c: 1 } }
+      ] },
+
+    { id: 'p1-9', type: 'equation', source: 'P1 #9', prompt: '1 − 7a = −5 − 8a',
+      answer: { kind: 'int', value: -6 },
+      verify: function (a) { return 1 - 7 * a === -5 - 8 * a; },
+      steps: [
+        { say: 'Add 8a to both sides:', template: '1 + {a}a = −5', blanks: { a: 1 } },
+        { say: 'Subtract 1 from both sides:', template: 'a = {b}', blanks: { b: -6 } }
+      ] },
+
+    { id: 'p2-2', type: 'equation', source: 'P2 #2', prompt: '4n + 5 = −55',
+      answer: { kind: 'int', value: -15 },
+      verify: function (n) { return 4 * n + 5 === -55; },
+      steps: [
+        { say: 'Subtract 5 from both sides:', template: '4n = {a}', blanks: { a: -60 } },
+        { say: 'Divide both sides by 4:', template: 'n = {b}', blanks: { b: -15 } }
+      ] },
+
+    { id: 'p2-3', type: 'equation', source: 'P2 #3', prompt: '−1 − 7b = 83',
+      answer: { kind: 'int', value: -12 },
+      verify: function (b) { return -1 - 7 * b === 83; },
+      steps: [
+        { say: 'Add 1 to both sides:', template: '−7b = {a}', blanks: { a: 84 } },
+        { say: 'Divide both sides by −7:', template: 'b = {b}', blanks: { b: -12 } }
+      ] },
+
+    { id: 'p2-4', type: 'equation', source: 'P2 #4', prompt: '1 + b/4 = −1',
+      answer: { kind: 'int', value: -8 },
+      verify: function (b) { return 1 + b / 4 === -1; },
+      steps: [
+        { say: 'Subtract 1 from both sides:', template: 'b/4 = {a}', blanks: { a: -2 } },
+        { say: 'Multiply both sides by 4:', template: 'b = {b}', blanks: { b: -8 } }
+      ] },
+
+    { id: 'p2-5', type: 'equation', source: 'P2 #5', prompt: 'm/5 − 6 = −3',
+      answer: { kind: 'int', value: 15 },
+      verify: function (m) { return m / 5 - 6 === -3; },
+      steps: [
+        { say: 'Add 6 to both sides:', template: 'm/5 = {a}', blanks: { a: 3 } },
+        { say: 'Multiply both sides by 5:', template: 'm = {b}', blanks: { b: 15 } }
+      ] },
+
+    { id: 'p2-6', type: 'equation', source: 'P2 #6', prompt: '6(−8n − 1) = −294',
+      answer: { kind: 'int', value: 6 },
+      verify: function (n) { return 6 * (-8 * n - 1) === -294; },
+      steps: [
+        { say: 'Distribute the 6:', template: '{a}n − 6 = −294', blanks: { a: -48 } },
+        { say: 'Add 6 to both sides:', template: '−48n = {b}', blanks: { b: -288 } },
+        { say: 'Divide both sides by −48:', template: 'n = {c}', blanks: { c: 6 } }
+      ] },
+
+    { id: 'p2-7', type: 'equation', source: 'P2 #7', prompt: '−7(6 − 3n) = −84',
+      answer: { kind: 'int', value: -2 },
+      verify: function (n) { return -7 * (6 - 3 * n) === -84; },
+      steps: [
+        { say: 'Distribute the −7:', template: '−42 + {a}n = −84', blanks: { a: 21 } },
+        { say: 'Add 42 to both sides:', template: '21n = {b}', blanks: { b: -42 } },
+        { say: 'Divide both sides by 21:', template: 'n = {c}', blanks: { c: -2 } }
+      ] },
+
+    { id: 'p2-8', type: 'equation', source: 'P2 #8', prompt: '3p − 7 = 4p − 2',
+      answer: { kind: 'int', value: -5 },
+      verify: function (p) { return 3 * p - 7 === 4 * p - 2; },
+      steps: [
+        { say: 'Subtract 4p from both sides:', template: '{a}p − 7 = −2', blanks: { a: -1 } },
+        { say: 'Add 7 to both sides:', template: '−p = {b}', blanks: { b: 5 } },
+        { say: 'Divide both sides by −1:', template: 'p = {c}', blanks: { c: -5 } }
+      ] },
+
+    // The student subtracted 2x here instead of adding it, and got x = −2.
+    { id: 'p2-9', type: 'equation', source: 'P2 #9', prompt: 'x + 7 = −2x + 7',
+      answer: { kind: 'int', value: 0 },
+      verify: function (x) { return x + 7 === -2 * x + 7; },
+      steps: [
+        { say: 'Add 2x to both sides:', template: '{a}x + 7 = 7', blanks: { a: 3 } },
+        { say: 'Subtract 7 from both sides:', template: '3x = {b}', blanks: { b: 0 } },
+        { say: 'Divide both sides by 3:', template: 'x = {c}', blanks: { c: 0 } }
+      ] },
+
+    // ---- Type 5: evaluate at given values (Part I #10-11, Part II #10a-b)
+    // Both Part I items were missed the same way: subtracting a negative.
+    { id: 'p1-10', type: 'evaluate', source: 'P1 #10',
+      prompt: 'p − r + p    when p = −8 and r = −7',
+      answer: { kind: 'int', value: -9 },
+      verify: function (v) { return (-8) - (-7) + (-8) === v; },
+      steps: [
+        { say: 'Substitute the values:', template: '(−8) − ({a}) + (−8)', blanks: { a: -7 } },
+        { say: 'Subtracting a negative is adding. Rewrite it:', template: '−8 + {b} − 8', blanks: { b: 7 } },
+        { say: 'Add left to right:', template: '{c}', blanks: { c: -9 } }
+      ] },
+
+    { id: 'p1-11', type: 'evaluate', source: 'P1 #11',
+      prompt: 'y + xy − x    when x = −3 and y = 2',
+      answer: { kind: 'int', value: -1 },
+      verify: function (v) { return 2 + (-3) * 2 - (-3) === v; },
+      steps: [
+        { say: 'Substitute the values:', template: '(2) + (−3)(2) − ({a})', blanks: { a: -3 } },
+        { say: 'Multiply first:', template: '2 + ({b}) − (−3)', blanks: { b: -6 } },
+        { say: 'Subtracting a negative is adding. Rewrite it:', template: '2 − 6 + {c}', blanks: { c: 3 } },
+        { say: 'Add left to right:', template: '{d}', blanks: { d: -1 } }
+      ] },
+
+    { id: 'p2-10a', type: 'evaluate', source: 'P2 #10a',
+      prompt: '−5 + z − y    when y = 7 and z = −4',
+      answer: { kind: 'int', value: -16 },
+      verify: function (v) { return -5 + (-4) - 7 === v; },
+      steps: [
+        { say: 'Substitute the values:', template: '−5 + ({a}) − (7)', blanks: { a: -4 } },
+        { say: 'Drop the parentheses:', template: '−5 − 4 − {b}', blanks: { b: 7 } },
+        { say: 'Add left to right:', template: '{c}', blanks: { c: -16 } }
+      ] },
+
+    { id: 'p2-10b', type: 'evaluate', source: 'P2 #10b',
+      prompt: 'r + r(m) + m    when r = 10 and m = −8',
+      answer: { kind: 'int', value: -78 },
+      verify: function (v) { return 10 + 10 * (-8) + (-8) === v; },
+      steps: [
+        { say: 'Substitute the values:', template: '(10) + (10)({a}) + (−8)', blanks: { a: -8 } },
+        { say: 'Multiply first:', template: '10 + ({b}) − 8', blanks: { b: -80 } },
+        { say: 'Add left to right:', template: '{c}', blanks: { c: -78 } }
+      ] },
+
+    // ---- Type 6: multiply or divide fractions, fully simplified
+    { id: 'p1-12', type: 'fraction', source: 'P1 #12', prompt: '18/10 · 15/20',
+      answer: { kind: 'fraction', num: 27, den: 20 },
+      verify: function (f) { return Math.abs((18 / 10) * (15 / 20) - f.num / f.den) < 1e-9; },
+      steps: [
+        { say: 'Cancel 18 and 10 by their common factor 2:', template: '{a}/5 · 15/20', blanks: { a: 9 } },
+        { say: 'Cancel 15 and 20 by their common factor 5:', template: '9/5 · 3/{b}', blanks: { b: 4 } },
+        { say: 'Multiply across:', template: '{c}', blanks: { c: '27/20' } }
+      ] },
+
+    { id: 'p1-13', type: 'fraction', source: 'P1 #13', prompt: '27/10 ÷ 18/8',
+      answer: { kind: 'fraction', num: 6, den: 5 },
+      verify: function (f) { return Math.abs((27 / 10) / (18 / 8) - f.num / f.den) < 1e-9; },
+      steps: [
+        { say: 'Keep, change, flip — turn the divide into a multiply:', template: '27/10 · {a}/18', blanks: { a: 8 } },
+        { say: 'Cancel 27 and 18 by 9, then 8 and 10 by 2, and reduce 4/2:', template: '3/5 · {b}/1', blanks: { b: 2 } },
+        { say: 'Multiply across:', template: '{c}', blanks: { c: '6/5' } }
+      ] },
+
+    { id: 'p2-11', type: 'fraction', source: 'P2 #11', prompt: '12/22 ÷ 42/33',
+      answer: { kind: 'fraction', num: 3, den: 7 },
+      verify: function (f) { return Math.abs((12 / 22) / (42 / 33) - f.num / f.den) < 1e-9; },
+      steps: [
+        { say: 'Keep, change, flip — turn the divide into a multiply:', template: '12/22 · {a}/42', blanks: { a: 33 } },
+        { say: 'Cancel 12 and 22 by 2, and 33 and 42 by 3:', template: '6/11 · 11/{b}', blanks: { b: 14 } },
+        { say: 'Cancel the 11s, then 6 and 14 by 2:', template: '3/1 · 1/{c}', blanks: { c: 7 } },
+        { say: 'Multiply across:', template: '{d}', blanks: { d: '3/7' } }
+      ] },
+
+    { id: 'p2-12', type: 'fraction', source: 'P2 #12', prompt: '4/18 · 30/35',
+      answer: { kind: 'fraction', num: 4, den: 21 },
+      verify: function (f) { return Math.abs((4 / 18) * (30 / 35) - f.num / f.den) < 1e-9; },
+      steps: [
+        { say: 'Cancel 4 and 18 by 2, and 30 and 35 by 5:', template: '2/9 · {a}/7', blanks: { a: 6 } },
+        { say: 'Cancel 6 and 9 by their common factor 3:', template: '2/3 · {b}/7', blanks: { b: 2 } },
+        { say: 'Multiply across:', template: '{c}', blanks: { c: '4/21' } }
+      ] },
+
+    // ---- Type 7: radicals WITH the calculator, rounded to hundredths
+    { id: 'p1-14', type: 'radical-calc', source: 'P1 #14', prompt: '√250',
+      answer: { kind: 'decimal2', value: 15.81 },
+      verify: function (v) { return Math.abs(Math.sqrt(250) - v) < 0.005; },
+      steps: [
+        { say: 'Round √250 = 15.8113… to the hundredths place:', template: '{a}', blanks: { a: '15.81' } }
+      ] },
+
+    { id: 'p1-15', type: 'radical-calc', source: 'P1 #15', prompt: '√58',
+      answer: { kind: 'decimal2', value: 7.62 },
+      verify: function (v) { return Math.abs(Math.sqrt(58) - v) < 0.005; },
+      steps: [
+        { say: 'Round √58 = 7.6157… to the hundredths place:', template: '{a}', blanks: { a: '7.62' } }
+      ] },
+
+    { id: 'p2-13', type: 'radical-calc', source: 'P2 #13', prompt: '√35',
+      answer: { kind: 'decimal2', value: 5.92 },
+      verify: function (v) { return Math.abs(Math.sqrt(35) - v) < 0.005; },
+      steps: [
+        { say: 'Round √35 = 5.9160… to the hundredths place:', template: '{a}', blanks: { a: '5.92' } }
+      ] },
+
+    { id: 'p2-14', type: 'radical-calc', source: 'P2 #14', prompt: '√110',
+      answer: { kind: 'decimal2', value: 10.49 },
+      verify: function (v) { return Math.abs(Math.sqrt(110) - v) < 0.005; },
+      steps: [
+        { say: 'Round √110 = 10.4880… to the hundredths place:', template: '{a}', blanks: { a: '10.49' } }
+      ] },
+
+    // ---- Type 8a: radicals WITHOUT the calculator -- exact answers only
+    { id: 'p1-16', type: 'radical-exact', source: 'P1 #16', prompt: '√250',
+      answer: { kind: 'radical', coef: 5, rad: 10 },
+      verify: function (a) { return Math.abs(a.coef * Math.sqrt(a.rad) - Math.sqrt(250)) < 1e-9; },
+      steps: [
+        { say: 'Find the largest perfect square that divides 250:', template: '√250 = √({a} · 10)', blanks: { a: 25 } },
+        { say: 'Take the square root of 25 out front:', template: '{b}√10', blanks: { b: 5 } },
+        { say: 'Write the complete simplified answer:', template: '{c}', blanks: { c: '5√10' } }
+      ] },
+
+    { id: 'p1-17', type: 'radical-exact', source: 'P1 #17', prompt: '√56',
+      answer: { kind: 'radical', coef: 2, rad: 14 },
+      verify: function (a) { return Math.abs(a.coef * Math.sqrt(a.rad) - Math.sqrt(56)) < 1e-9; },
+      steps: [
+        { say: 'Find the largest perfect square that divides 56:', template: '√56 = √({a} · 14)', blanks: { a: 4 } },
+        { say: 'Take the square root of 4 out front:', template: '{b}√14', blanks: { b: 2 } },
+        { say: 'Write the complete simplified answer:', template: '{c}', blanks: { c: '2√14' } }
+      ] },
+
+    { id: 'p2-15', type: 'radical-exact', source: 'P2 #15', prompt: '√84',
+      answer: { kind: 'radical', coef: 2, rad: 21 },
+      verify: function (a) { return Math.abs(a.coef * Math.sqrt(a.rad) - Math.sqrt(84)) < 1e-9; },
+      steps: [
+        { say: 'Find the largest perfect square that divides 84:', template: '√84 = √({a} · 21)', blanks: { a: 4 } },
+        { say: 'Take the square root of 4 out front:', template: '{b}√21', blanks: { b: 2 } },
+        { say: 'Write the complete simplified answer:', template: '{c}', blanks: { c: '2√21' } }
+      ] },
+
+    // ---- Type 8b: exponents. The minus sign is inside the parentheses or
+    // it is not, and that is the whole question.
+    { id: 'p1-18', type: 'exponent', source: 'P1 #18', prompt: '18²',
+      answer: { kind: 'int', value: 324 },
+      verify: function (v) { return 18 * 18 === v; },
+      steps: [
+        { say: 'Write it as a product:', template: '18 · 18 = {a}', blanks: { a: 324 } }
+      ] },
+
+    { id: 'p1-19', type: 'exponent', source: 'P1 #19', prompt: '(−17)²',
+      answer: { kind: 'int', value: 289 },
+      verify: function (v) { return (-17) * (-17) === v; },
+      steps: [
+        { say: 'The −17 is inside the parentheses, so both factors are negative:', template: '(−17) · (−17) = {a}', blanks: { a: 289 } }
+      ] },
+
+    { id: 'p1-20', type: 'exponent', source: 'P1 #20', prompt: '−6²',
+      answer: { kind: 'int', value: -36 },
+      verify: function (v) { return -(6 * 6) === v; },
+      steps: [
+        { say: 'No parentheses, so only the 6 is squared:', template: '−(6 · 6) = {a}', blanks: { a: -36 } }
+      ] },
+
+    { id: 'p2-16', type: 'exponent', source: 'P2 #16', prompt: '9²',
+      answer: { kind: 'int', value: 81 },
+      verify: function (v) { return 9 * 9 === v; },
+      steps: [
+        { say: 'Write it as a product:', template: '9 · 9 = {a}', blanks: { a: 81 } }
+      ] },
+
+    { id: 'p2-17', type: 'exponent', source: 'P2 #17', prompt: '−15²',
+      answer: { kind: 'int', value: -225 },
+      verify: function (v) { return -(15 * 15) === v; },
+      steps: [
+        { say: 'No parentheses, so only the 15 is squared:', template: '−(15 · 15) = {a}', blanks: { a: -225 } }
+      ] },
+
+    { id: 'p2-18', type: 'exponent', source: 'P2 #18', prompt: '(−24)²',
+      answer: { kind: 'int', value: 576 },
+      verify: function (v) { return (-24) * (-24) === v; },
+      steps: [
+        { say: 'The −24 is inside the parentheses, so both factors are negative:', template: '(−24) · (−24) = {a}', blanks: { a: 576 } }
+      ] }
+  ];
+
+  globalThis.PROBLEMS = PROBLEMS;
+  globalThis.walkProblem = walkProblem;
+  globalThis.verifyArg = verifyArg;
+})();
+
+// Fresh problems in the same shape as the authored ones, so drilling a topic
+// cannot decay into memorising the study guide. No DOM access.
+(function () {
+  var TYPES = ['plane', 'signs', 'intercepts', 'equation', 'evaluate',
+               'fraction', 'radical-calc', 'radical-exact', 'exponent'];
+
+  // Mulberry32: small, fast, and deterministic across runs.
+  function makeRng(seed) {
+    var s = seed >>> 0;
+    return function () {
+      s = (s + 0x6D2B79F5) >>> 0;
+      var t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // "Subtract −2a from both sides" is exactly the confusion this tool exists
+  // to fix. Say the move the way a teacher would: a negative term is added.
+  function undo(n, tail) {
+    tail = tail || '';
+    return n < 0 ? 'Add ' + (-n) + tail + ' to both sides:'
+                 : 'Subtract ' + n + tail + ' from both sides:';
+  }
+
+  function pick(rng, list) { return list[Math.floor(rng() * list.length)]; }
+  function between(rng, lo, hi) { return lo + Math.floor(rng() * (hi - lo + 1)); }
+  function nonZero(rng, lo, hi) {
+    var v = 0;
+    while (v === 0) v = between(rng, lo, hi);
+    return v;
+  }
+  // Worksheets write minus as U+2212, and the app should match.
+  function sign(n) { return n < 0 ? '−' + Math.abs(n) : String(n); }
+  function plus(n) { return n < 0 ? '− ' + Math.abs(n) : '+ ' + n; }
+
+  function gcdOf(a, b) {
+    a = Math.abs(a); b = Math.abs(b);
+    while (b) { var t = b; b = a % b; a = t; }
+    return a || 1;
+  }
+
+  var QUADRANTS = [
+    { name: 'I', x: '+', y: '+' }, { name: 'II', x: '-', y: '+' },
+    { name: 'III', x: '-', y: '-' }, { name: 'IV', x: '+', y: '-' }
+  ];
+
+  function genPlane(rng) {
+    var targets = ['x-axis', 'y-axis', 'origin', 'I', 'II', 'III', 'IV'];
+    var target = pick(rng, targets);
+    var isQuad = /^(I|II|III|IV)$/.test(target);
+    return {
+      id: 'gen-plane-' + target, type: 'plane', source: 'generated',
+      prompt: isQuad ? 'Which quadrant is highlighted?' : 'What is the highlighted part called?',
+      answer: { kind: 'label', value: isQuad ? 'quadrant ' + target : target },
+      figure: { shape: 'plane', target: target },
+      verify: function () { return true; },
+      steps: [{ say: 'Name the highlighted part:', template: '{a}',
+                blanks: { a: isQuad ? 'quadrant ' + target : target } }]
+    };
+  }
+
+  function genSigns(rng) {
+    var q = pick(rng, QUADRANTS);
+    return {
+      id: 'gen-signs-' + q.name, type: 'signs', source: 'generated',
+      prompt: 'In quadrant ' + q.name + ', are x and y positive or negative?',
+      answer: { kind: 'signs', x: q.x, y: q.y },
+      figure: { shape: 'plane', target: q.name },
+      verify: function () { return true; },
+      steps: [{ say: 'Give the signs as (x, y):', template: '({a})',
+                blanks: { a: q.x + ',' + q.y } }]
+    };
+  }
+
+  // Both intercepts are asked as whole ordered pairs, which is also how the
+  // student got P1 #3b wrong: he gave (−2,0) and (0,−5) for a line whose
+  // intercepts are (−5,0) and (0,−2).
+  function genIntercepts(rng) {
+    var xi = nonZero(rng, -6, 6), yi = nonZero(rng, -6, 6);
+    return {
+      id: 'gen-int-' + xi + '-' + yi, type: 'intercepts', source: 'generated',
+      prompt: 'Name the x- and y-intercepts of the line.',
+      answer: { kind: 'pair', x: 0, y: yi },
+      figure: { shape: 'line', xInt: xi, yInt: yi },
+      verify: function (a) { return a.x === 0 && a.y === yi; },
+      steps: [
+        { say: 'The x-intercept is where the line crosses the x-axis, so y = 0:',
+          template: '{a}', blanks: { a: '(' + xi + ',0)' } },
+        { say: 'The y-intercept is where it crosses the y-axis, so x = 0:',
+          template: '{b}', blanks: { b: '(0,' + yi + ')' } }
+      ]
+    };
+  }
+
+  // Four shapes, all with integer solutions: ax + b = c, a(x + b) = c,
+  // ax + b = cx + d, and x/a + b = c.
+  function genEquation(rng) {
+    var v = pick(rng, ['n', 'x', 'p', 'b', 'm', 'a']);
+    var ans = between(rng, -15, 15);
+    var shape = between(rng, 1, 4);
+
+    if (shape === 1) {
+      var a = nonZero(rng, -9, 9), b = nonZero(rng, -20, 20);
+      var c = a * ans + b;
+      return {
+        id: 'gen-eq1', type: 'equation', source: 'generated',
+        prompt: sign(a) + v + ' ' + plus(b) + ' = ' + sign(c),
+        answer: { kind: 'int', value: ans },
+        verify: function (x) { return a * x + b === c; },
+        steps: [
+          { say: undo(b), template: sign(a) + v + ' = {p}', blanks: { p: c - b } },
+          { say: 'Divide both sides by ' + a + ':', template: v + ' = {q}', blanks: { q: ans } }
+        ]
+      };
+    }
+    if (shape === 2) {
+      var a2 = nonZero(rng, -8, 8), b2 = nonZero(rng, -12, 12);
+      var c2 = a2 * (ans + b2);
+      return {
+        id: 'gen-eq2', type: 'equation', source: 'generated',
+        prompt: sign(a2) + '(' + v + ' ' + plus(b2) + ') = ' + sign(c2),
+        answer: { kind: 'int', value: ans },
+        verify: function (x) { return a2 * (x + b2) === c2; },
+        steps: [
+          { say: 'Distribute the ' + a2 + ':', template: sign(a2) + v + ' ' + plus(a2 * b2) + ' = ' + sign(c2), blanks: {} },
+          { say: undo(a2 * b2), template: sign(a2) + v + ' = {p}', blanks: { p: c2 - a2 * b2 } },
+          { say: 'Divide both sides by ' + a2 + ':', template: v + ' = {q}', blanks: { q: ans } }
+        ]
+      };
+    }
+    if (shape === 3) {
+      var a3 = nonZero(rng, -9, 9), c3 = nonZero(rng, -9, 9);
+      while (a3 === c3) c3 = nonZero(rng, -9, 9);
+      var b3 = nonZero(rng, -20, 20);
+      var d3 = (a3 - c3) * ans + b3;
+      return {
+        id: 'gen-eq3', type: 'equation', source: 'generated',
+        prompt: sign(a3) + v + ' ' + plus(b3) + ' = ' + sign(c3) + v + ' ' + plus(d3),
+        answer: { kind: 'int', value: ans },
+        verify: function (x) { return a3 * x + b3 === c3 * x + d3; },
+        steps: [
+          { say: 'Move the variable terms together — ' + undo(c3, v).charAt(0).toLowerCase() + undo(c3, v).slice(1),
+            template: '{p}' + v + ' ' + plus(b3) + ' = ' + sign(d3), blanks: { p: a3 - c3 } },
+          { say: undo(b3),
+            template: sign(a3 - c3) + v + ' = {q}', blanks: { q: d3 - b3 } },
+          { say: 'Divide both sides by ' + (a3 - c3) + ':', template: v + ' = {r}', blanks: { r: ans } }
+        ]
+      };
+    }
+    var d4 = between(rng, 2, 12), b4 = nonZero(rng, -12, 12);
+    var c4 = ans / d4 + b4;
+    // Keep the division exact by rebuilding the answer as a multiple of d4.
+    var ans4 = between(rng, -8, 8) * d4;
+    c4 = ans4 / d4 + b4;
+    return {
+      id: 'gen-eq4', type: 'equation', source: 'generated',
+      prompt: v + '/' + d4 + ' ' + plus(b4) + ' = ' + sign(c4),
+      answer: { kind: 'int', value: ans4 },
+      verify: function (x) { return x / d4 + b4 === c4; },
+      steps: [
+        { say: undo(b4), template: v + '/' + d4 + ' = {p}', blanks: { p: c4 - b4 } },
+        { say: 'Multiply both sides by ' + d4 + ':', template: v + ' = {q}', blanks: { q: ans4 } }
+      ]
+    };
+  }
+
+  // Always includes a subtraction of a negative -- the single move that
+  // accounts for both evaluate errors on the guides.
+  function genEvaluate(rng) {
+    var a = nonZero(rng, -9, 9), b = nonZero(rng, -9, 9);
+    var value = a - b + a;
+    return {
+      id: 'gen-eval', type: 'evaluate', source: 'generated',
+      prompt: 'p − r + p    when p = ' + sign(a) + ' and r = ' + sign(b),
+      answer: { kind: 'int', value: value },
+      verify: function (v) { return a - b + a === v; },
+      steps: [
+        { say: 'Substitute the values:',
+          template: '(' + sign(a) + ') − ({s}) + (' + sign(a) + ')', blanks: { s: b } },
+        { say: b < 0 ? 'Subtracting a negative is adding. Rewrite it:' : 'Drop the parentheses:',
+          template: sign(a) + ' ' + plus(-b) + ' ' + plus(a), blanks: {} },
+        { say: 'Add left to right:', template: '{t}', blanks: { t: value } }
+      ]
+    };
+  }
+
+  // Generated fractions take the multiply-then-simplify route rather than
+  // cancelling first, so the bad-cross-cancel detector applies to the
+  // authored problems only. That is deliberate: inventing a legal
+  // cancellation pair for arbitrary numerators and denominators is a
+  // different problem from generating the arithmetic.
+  function genFraction(rng) {
+    var n1 = between(rng, 2, 12), d1 = between(rng, 2, 12);
+    var n2 = between(rng, 2, 12), d2 = between(rng, 2, 12);
+    var divide = rng() < 0.5;
+    var num = divide ? n1 * d2 : n1 * n2;
+    var den = divide ? d1 * n2 : d1 * d2;
+    var g = gcdOf(num, den);
+    var rn = num / g, rd = den / g;
+    var shown = divide ? (n1 + '/' + d1 + ' ÷ ' + n2 + '/' + d2)
+                       : (n1 + '/' + d1 + ' · ' + n2 + '/' + d2);
+    var steps = [];
+    if (divide) {
+      steps.push({ say: 'Keep, change, flip — turn the divide into a multiply:',
+                   template: n1 + '/' + d1 + ' · {f}/' + n2, blanks: { f: d2 } });
+    }
+    steps.push({ say: 'Multiply straight across:',
+                 template: '{m}/' + den, blanks: { m: num } });
+    steps.push({ say: 'Simplify completely:', template: '{r}', blanks: { r: rn + '/' + rd } });
+    return {
+      id: 'gen-frac', type: 'fraction', source: 'generated', prompt: shown,
+      answer: { kind: 'fraction', num: rn, den: rd },
+      verify: function (f) { return Math.abs(num / den - f.num / f.den) < 1e-9; },
+      steps: steps
+    };
+  }
+
+  function round2(x) { return Math.round(x * 100) / 100; }
+
+  function genRadicalCalc(rng) {
+    var n = between(rng, 20, 200);
+    while (Math.sqrt(n) === Math.round(Math.sqrt(n))) n = between(rng, 20, 200);
+    var v = round2(Math.sqrt(n));
+    return {
+      id: 'gen-radc', type: 'radical-calc', source: 'generated', prompt: '√' + n,
+      answer: { kind: 'decimal2', value: v },
+      verify: function (x) { return Math.abs(Math.sqrt(n) - x) < 0.005; },
+      steps: [{ say: 'Round √' + n + ' = ' + Math.sqrt(n).toFixed(4) +
+                     '… to the hundredths place:',
+                template: '{a}', blanks: { a: v.toFixed(2) } }]
+    };
+  }
+
+  function genRadicalExact(rng) {
+    var coef = between(rng, 2, 7);
+    var radicands = [2, 3, 5, 6, 7, 10, 11, 13, 14, 15, 17, 19, 21, 22, 23];
+    var rad = pick(rng, radicands);
+    var n = coef * coef * rad;
+    return {
+      id: 'gen-rade', type: 'radical-exact', source: 'generated', prompt: '√' + n,
+      answer: { kind: 'radical', coef: coef, rad: rad },
+      verify: function (a) { return Math.abs(a.coef * Math.sqrt(a.rad) - Math.sqrt(n)) < 1e-9; },
+      steps: [
+        { say: 'Find the largest perfect square that divides ' + n + ':',
+          template: '√' + n + ' = √({a} · ' + rad + ')', blanks: { a: coef * coef } },
+        { say: 'Take the square root of ' + (coef * coef) + ' out front:',
+          template: '{b}√' + rad, blanks: { b: coef } },
+        { say: 'Write the complete simplified answer:',
+          template: '{c}', blanks: { c: coef + '√' + rad } }
+      ]
+    };
+  }
+
+  function genExponent(rng) {
+    var base = between(rng, 3, 25);
+    var form = between(rng, 1, 3);   // 1: n^2   2: (-n)^2   3: -n^2
+    if (form === 1) {
+      return {
+        id: 'gen-exp1', type: 'exponent', source: 'generated', prompt: base + '²',
+        answer: { kind: 'int', value: base * base },
+        verify: function (v) { return base * base === v; },
+        steps: [{ say: 'Write it as a product:',
+                  template: base + ' · ' + base + ' = {a}', blanks: { a: base * base } }]
+      };
+    }
+    if (form === 2) {
+      return {
+        id: 'gen-exp2', type: 'exponent', source: 'generated', prompt: '(−' + base + ')²',
+        answer: { kind: 'int', value: base * base },
+        verify: function (v) { return base * base === v; },
+        steps: [{ say: 'The −' + base + ' is inside the parentheses, so both factors are negative:',
+                  template: '(−' + base + ') · (−' + base + ') = {a}', blanks: { a: base * base } }]
+      };
+    }
+    return {
+      id: 'gen-exp3', type: 'exponent', source: 'generated', prompt: '−' + base + '²',
+      answer: { kind: 'int', value: -(base * base) },
+      verify: function (v) { return -(base * base) === v; },
+      steps: [{ say: 'No parentheses, so only the ' + base + ' is squared:',
+                template: '−(' + base + ' · ' + base + ') = {a}', blanks: { a: -(base * base) } }]
+    };
+  }
+
+  var BY_TYPE = {
+    'plane': genPlane, 'signs': genSigns, 'intercepts': genIntercepts,
+    'equation': genEquation, 'evaluate': genEvaluate, 'fraction': genFraction,
+    'radical-calc': genRadicalCalc, 'radical-exact': genRadicalExact,
+    'exponent': genExponent
+  };
+
+  function generate(type, rng) {
+    var fn = BY_TYPE[type];
+    if (!fn) throw new Error('unknown problem type: ' + type);
+    return fn(rng);
+  }
+
+  globalThis.TYPES = TYPES;
+  globalThis.makeRng = makeRng;
+  globalThis.generate = generate;
+})();
+
+// Targeted feedback for the five misconceptions visible on the completed
+// study guides. Each detector recognises a specific wrong value; a wrong
+// answer that matches none of them returns '' so the caller stays generic.
+(function () {
+  function num(text) {
+    var s = String(text).replace(/−/g, '-').trim();
+    return /^[+-]?\d+$/.test(s) ? parseInt(s, 10) : null;
+  }
+
+  function correctValue(step, blankName) { return step.blanks[blankName]; }
+
+  // 1. Subtracting a negative. The step's own wording flags it, and the
+  //    telltale wrong answer is the sign-flipped correct one.
+  function subtractNegative(c) {
+    if (!/Subtracting a negative/i.test(c.step.say)) return '';
+    var want = num(correctValue(c.step, c.blankName));
+    var got = num(c.typed);
+    if (want === null || got === null || got !== -want) return '';
+    return 'Subtracting a negative is the same as adding. ' +
+           '− (−' + Math.abs(want) + ') becomes + ' + Math.abs(want) + '.';
+  }
+
+  // 2. Dividing zero. He reached 2n = 0 and then wrote n = 2.
+  function zeroQuotient(c) {
+    if (num(correctValue(c.step, c.blankName)) !== 0) return '';
+    var got = num(c.typed);
+    if (got === null || got === 0) return '';
+    var m = c.step.say.match(/Divide both sides by (−?-?\d+)/);
+    if (!m) return '';
+    var divisor = Math.abs(num(m[1].replace('−', '-')));
+    if (Math.abs(got) !== divisor) return '';
+    return '0 divided by ' + divisor + ' is 0, not ' + divisor + '. ' +
+           'Zero split any number of ways is still zero.';
+  }
+
+  // 3. Moving a negative variable term. Subtracting -2x instead of adding it
+  //    turns a coefficient of a+|b| into a-|b|.
+  function negativeTermAcross(c) {
+    // Case-insensitive: authored steps open with 'Add 2x…', generated ones
+    // read '…together — add 2a to both sides'.
+    var m = c.step.say.match(/add (\d+)([a-z]) to both sides/i);
+    if (!m) return '';
+    var moved = parseInt(m[1], 10);
+    var want = num(correctValue(c.step, c.blankName));
+    var got = num(c.typed);
+    if (want === null || got === null) return '';
+    if (got !== want - 2 * moved) return '';
+    return 'That term is −' + moved + m[2] + ', already negative. ' +
+           'To cancel it you add ' + moved + m[2] + ' to both sides, not subtract it.';
+  }
+
+  // 4. Cancelling a numerator against another numerator. The step names the
+  //    two numbers that may legally cancel; anything else is the error.
+  function badCrossCancel(c) {
+    var m = c.step.say.match(/Cancel (\d+) and (\d+) by/);
+    if (!m) return '';
+    var want = num(correctValue(c.step, c.blankName));
+    var got = num(c.typed);
+    if (want === null || got === null || got === want) return '';
+    var a = parseInt(m[1], 10);
+    // Did they divide the first number by a factor it shares with some other
+    // number in the problem, rather than with its own partner?
+    if (got <= 0 || a % got !== 0) return '';
+    return 'You can only cancel a top against a bottom. ' +
+           'Check that the two numbers you cancelled are on opposite sides of a fraction bar.';
+  }
+
+  // 5. Swapped intercepts: the pair typed is the OTHER intercept's numbers.
+  function swappedIntercepts(c) {
+    if (c.problem.type !== 'intercepts') return '';
+    var want = String(correctValue(c.step, c.blankName)).replace(/[()\s]/g, '');
+    var got = String(c.typed).replace(/[()\s−]/g, function (ch) {
+      return ch === '−' ? '-' : '';
+    });
+    var w = want.split(','), g = got.split(',');
+    if (w.length !== 2 || g.length !== 2) return '';
+    if (g[0] === w[0] && g[1] === w[1]) return '';
+    var f = c.problem.figure;
+    var other = (w[1] === '0') ? ['0', String(f.yInt)] : [String(f.xInt), '0'];
+    // Only fire when the numbers are right but attached to the wrong axis.
+    if (!(g[0] === other[1] && g[1] === other[0]) &&
+        !(g[0] === other[0] && g[1] === other[1])) return '';
+    return 'Check which axis each one crosses. The x-intercept has y = 0, ' +
+           'and the y-intercept has x = 0.';
+  }
+
+  var DETECTORS = [subtractNegative, zeroQuotient, negativeTermAcross,
+                   badCrossCancel, swappedIntercepts];
+
+  function hintFor(context) {
+    for (var i = 0; i < DETECTORS.length; i++) {
+      var h = DETECTORS[i](context);
+      if (h) return h;
+    }
+    return '';
+  }
+
+  globalThis.hintFor = hintFor;
+})();
+
+// Per-topic mastery streaks and cross-session trouble spots.
+// Pure: takes and returns plain objects, never touches localStorage itself.
+(function () {
+  var VERSION = 1;
+  var STORAGE_KEY = 'study-time.geometry-10.progress';
+
+  function empty() { return { version: VERSION, mastery: {}, misses: {} }; }
+
+  function isPlainObject(v) {
+    return v !== null && typeof v === 'object' && !(v instanceof Array);
+  }
+
+  // Anything unexpected yields a fresh record. A study tool losing history is
+  // a nuisance; a study tool refusing to start is a broken evening.
+  function parseProgress(json) {
+    if (!json) return empty();
+    var data;
+    try { data = JSON.parse(json); } catch (e) { return empty(); }
+    if (!isPlainObject(data)) return empty();
+    if (data.version !== VERSION) return empty();
+    return {
+      version: VERSION,
+      mastery: isPlainObject(data.mastery) ? data.mastery : {},
+      misses: isPlainObject(data.misses) ? data.misses : {}
+    };
+  }
+
+  function copy(obj) {
+    var out = {};
+    for (var k in obj) { if (obj.hasOwnProperty(k)) out[k] = obj[k]; }
+    return out;
+  }
+
+  function recordResult(progress, type, problemId, firstTryCorrect) {
+    var mastery = copy(progress.mastery);
+    var misses = copy(progress.misses);
+    if (firstTryCorrect) {
+      mastery[type] = (mastery[type] || 0) + 1;
+    } else {
+      mastery[type] = 0;
+      misses[type] = (misses[type] || 0) + 1;
+    }
+    return { version: VERSION, mastery: mastery, misses: misses };
+  }
+
+  function masteryStreak(progress, type) { return progress.mastery[type] || 0; }
+
+  function troubleSpots(progress) {
+    var out = [];
+    for (var type in progress.misses) {
+      if (progress.misses.hasOwnProperty(type) && progress.misses[type] > 0) {
+        out.push({ type: type, misses: progress.misses[type] });
+      }
+    }
+    out.sort(function (a, b) {
+      return b.misses - a.misses || (a.type < b.type ? -1 : 1);
+    });
+    return out;
+  }
+
+  function serializeProgress(progress) { return JSON.stringify(progress); }
+
+  globalThis.STORAGE_KEY = STORAGE_KEY;
+  globalThis.parseProgress = parseProgress;
+  globalThis.recordResult = recordResult;
+  globalThis.masteryStreak = masteryStreak;
+  globalThis.troubleSpots = troubleSpots;
+  globalThis.serializeProgress = serializeProgress;
+})();
+
+// Drill and mock-test sequencing. Owns attempt counting and scoring.
+// No DOM access.
+(function () {
+  var MASTERY_TARGET = 4;
+
+  // Proportioned like the study guides. The real Test #1 has not been seen.
+  var MOCK_MIX = [
+    { type: 'plane', count: 1 },
+    { type: 'signs', count: 1 },
+    { type: 'intercepts', count: 2 },
+    { type: 'equation', count: 6 },
+    { type: 'evaluate', count: 2 },
+    { type: 'fraction', count: 2 },
+    { type: 'radical-calc', count: 2 },
+    { type: 'radical-exact', count: 2 },
+    { type: 'exponent', count: 2 }
+  ];
+
+  function blankNames(step) { return Object.keys(step.blanks); }
+
+  // Display-only steps carry no blanks and are skipped when advancing.
+  function firstAnswerable(problem, from) {
+    for (var i = from; i < problem.steps.length; i++) {
+      if (blankNames(problem.steps[i]).length > 0) return i;
+    }
+    return -1;
+  }
+
+  function createSession(config) {
+    var queue = config.queue;          // array of problem objects
+    var isDrill = config.isDrill;
+    var type = config.type;
+    var nextProblem = config.nextProblem;  // function or null
+
+    var problem = null, stepIndex = -1, blankIdx = 0;
+    var attempts = 0, revealed = false;
+    var cleanProblem = true;
+    var streak = 0, solved = 0, score = 0;
+    var missed = [];
+    var results = [];
+    var done = false;
+
+    // A problem whose every step is display-only has nothing to ask, so it is
+    // skipped rather than finished -- it must not reach results(). The cap
+    // keeps a generator that only ever yields such problems from spinning
+    // forever; it surfaces as a finished session instead of a hang.
+    function loadNext() {
+      for (var tries = 0; tries < 50; tries++) {
+        var p = queue.length ? queue.shift() : (nextProblem ? nextProblem() : null);
+        if (!p) { done = true; problem = null; return; }
+        problem = p;
+        stepIndex = firstAnswerable(p, 0);
+        blankIdx = 0; attempts = 0; revealed = false; cleanProblem = true;
+        if (stepIndex !== -1) return;
+      }
+      done = true; problem = null;
+    }
+
+    function currentStep() { return problem.steps[stepIndex]; }
+    function currentBlank() { return blankNames(currentStep())[blankIdx]; }
+
+    function finishProblem() {
+      solved += 1;
+      results.push({ type: problem.type, problemId: problem.id, clean: cleanProblem });
+      if (cleanProblem) { score += 1; streak += 1; } else { streak = 0; }
+      if (isDrill && streak >= MASTERY_TARGET) { done = true; problem = null; return; }
+      loadNext();
+    }
+
+    function advanceBlank() {
+      attempts = 0; revealed = false;
+      var names = blankNames(currentStep());
+      if (blankIdx + 1 < names.length) { blankIdx += 1; return; }
+      var next = firstAnswerable(problem, stepIndex + 1);
+      if (next === -1) { finishProblem(); return; }
+      stepIndex = next; blankIdx = 0;
+    }
+
+    function submit(text) {
+      if (done || problem === null) {
+        return { status: 'done', hint: '', revealed: false, advanced: false, complete: true };
+      }
+      var step = currentStep();
+      var name = currentBlank();
+      var spec = blankSpec(step.blanks[name]);
+      var result = checkAnswer(text, spec);
+
+      // Neither of these is a real attempt: the first has the right value and
+      // the second has no value at all.
+      if (result.status === 'unreduced' || result.status === 'malformed') {
+        return { status: result.status, hint: '', revealed: false,
+                 advanced: false, complete: false };
+      }
+
+      if (result.status === 'correct') {
+        advanceBlank();
+        return { status: 'correct', hint: '', revealed: false,
+                 advanced: true, complete: done };
+      }
+
+      attempts += 1;
+      cleanProblem = false;
+      if (attempts === 1) {
+        var hint = hintFor({ problem: problem, step: step,
+                             blankName: name, typed: text });
+        return { status: 'wrong', hint: hint, revealed: false,
+                 advanced: false, complete: false };
+      }
+      var shown = String(step.blanks[name]);
+      missed.push({ problem: problem, blankName: name });
+      advanceBlank();
+      return { status: 'revealed', hint: 'The answer is ' + shown + '.',
+               revealed: true, advanced: true, complete: done };
+    }
+
+    function current() {
+      if (done || problem === null) return null;
+      return { problem: problem, stepIndex: stepIndex,
+               blankName: currentBlank(), revealed: revealed };
+    }
+
+    function progressText() {
+      if (isDrill) {
+        return 'Problem ' + (solved + 1) + ' · streak ' + streak +
+               ' of ' + MASTERY_TARGET;
+      }
+      return 'Question ' + Math.min(solved + 1, config.total) +
+             ' of ' + config.total;
+    }
+
+    loadNext();
+
+    return {
+      current: current, submit: submit, progressText: progressText,
+      isDone: function () { return done; },
+      score: function () { return score; },
+      missed: function () { return missed.slice(); },
+      results: function () { return results.slice(); },
+      type: function () { return type; }
+    };
+  }
+
+  function createDrill(type, options) {
+    var opts = options || {};
+    var rng = opts.rng || makeRng(Math.floor(Math.random() * 1e9));
+    var authored = opts.problems || PROBLEMS.filter(function (p) {
+      return p.type === type;
+    });
+    // Authored problems first, then generated variants forever, so repeated
+    // drilling cannot decay into memorising the study guide.
+    return createSession({
+      queue: authored.slice(), isDrill: true, type: type,
+      nextProblem: function () { return generate(type, rng); }
+    });
+  }
+
+  function createMockTest(options) {
+    var opts = options || {};
+    var rng = opts.rng || makeRng(Math.floor(Math.random() * 1e9));
+    var queue = [];
+    for (var i = 0; i < MOCK_MIX.length; i++) {
+      for (var n = 0; n < MOCK_MIX[i].count; n++) {
+        queue.push(generate(MOCK_MIX[i].type, rng));
+      }
+    }
+    return createSession({
+      queue: queue, isDrill: false, type: 'mixed',
+      nextProblem: null, total: queue.length
+    });
+  }
+
+  globalThis.MASTERY_TARGET = MASTERY_TARGET;
+  globalThis.MOCK_MIX = MOCK_MIX;
+  globalThis.createDrill = createDrill;
+  globalThis.createMockTest = createMockTest;
+})();
+
+// All DOM rendering. Every other module is DOM-free and unit tested.
+(function () {
+  function el(id) { return document.getElementById(id); }
+  function show(id, on) { el(id).hidden = !on; }
+
+  var LABELS = {
+    'plane': 'Label the coordinate plane',
+    'signs': 'Signs in each quadrant',
+    'intercepts': 'x- and y-intercepts',
+    'equation': 'Solve equations',
+    'evaluate': 'Evaluate expressions',
+    'fraction': 'Multiply and divide fractions',
+    'radical-calc': 'Radicals with a calculator',
+    'radical-exact': 'Radicals without a calculator',
+    'exponent': 'Exponents'
+  };
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // Blanks before the active one show what was entered; the active one is an
+  // input; later ones are dimmed placeholders.
+  function renderTemplate(template, blanks, activeName, filled) {
+    return template.replace(/\{(\w+)\}/g, function (_, name) {
+      if (name === activeName) {
+        return '<input id="answer" type="text" inputmode="text" ' +
+               'spellcheck="false" autocomplete="off" autocorrect="off" ' +
+               'autocapitalize="off" aria-label="Answer">';
+      }
+      if (filled && filled.hasOwnProperty(name)) {
+        var cls = filled[name].shown ? 'shown' : 'filled';
+        return '<span class="' + cls + '">' +
+               escapeHtml(filled[name].text) + '</span>';
+      }
+      return '<span class="todo">___</span>';
+    });
+  }
+
+  // Replaced by the real implementation in Task 10. Until then, figures
+  // render as nothing rather than throwing.
+  function renderFigure() { return ''; }
+
+  var session = null, progress = null, filledByStep = {};
+
+  function loadProgress() {
+    var raw = null;
+    try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) { raw = null; }
+    return parseProgress(raw);
+  }
+
+  function saveProgress(p) {
+    try { localStorage.setItem(STORAGE_KEY, serializeProgress(p)); }
+    catch (e) { /* private browsing: progress simply will not persist */ }
+  }
+
+  function renderMenu() {
+    progress = loadProgress();
+    var list = el('topic-list');
+    list.innerHTML = '';
+    for (var i = 0; i < TYPES.length; i++) {
+      (function (type) {
+        var streak = masteryStreak(progress, type);
+        var pct = Math.min(100, (streak / MASTERY_TARGET) * 100);
+        var li = document.createElement('li');
+        var b = document.createElement('button');
+        b.innerHTML = '<span>' + escapeHtml(LABELS[type]) + '</span>' +
+                      '<span class="bar"><i style="width:' + pct + '%"></i></span>';
+        b.onclick = function () { begin(createDrill(type)); };
+        li.appendChild(b); list.appendChild(li);
+      })(TYPES[i]);
+    }
+    var spots = troubleSpots(progress);
+    show('trouble', spots.length > 0);
+    var tl = el('trouble-list');
+    tl.innerHTML = '';
+    for (var s = 0; s < spots.length; s++) {
+      var li2 = document.createElement('li');
+      li2.textContent = LABELS[spots[s].type] + ' — missed ' +
+                        spots[s].misses + (spots[s].misses === 1 ? ' time' : ' times');
+      tl.appendChild(li2);
+    }
+    show('menu-screen', true); show('quiz-screen', false); show('done-screen', false);
+  }
+
+  function begin(s) {
+    session = s; filledByStep = {};
+    show('menu-screen', false); show('done-screen', false); show('quiz-screen', true);
+    renderQuiz('');
+  }
+
+  function renderQuiz(feedback, tone) {
+    var cur = session.current();
+    if (cur === null) { renderDone(); return; }
+    var p = cur.problem;
+
+    el('progress').textContent = session.progressText();
+    el('prompt').innerHTML = escapeHtml(p.prompt);
+
+    var note = '';
+    if (p.type === 'radical-calc') note = 'Calculator OK — round to the hundredths place.';
+    if (p.type === 'radical-exact') note = 'No calculator. The answer must be exact — no decimals.';
+    el('calc-note').textContent = note;
+    show('calc-note', note !== '');
+
+    el('figure').innerHTML = p.figure ? renderFigure(p.figure) : '';
+
+    var ol = el('steps');
+    ol.innerHTML = '';
+    for (var i = 0; i < p.steps.length; i++) {
+      var step = p.steps[i];
+      var li = document.createElement('li');
+      li.className = i < cur.stepIndex ? 'past' : (i === cur.stepIndex ? 'active' : '');
+      var active = (i === cur.stepIndex) ? cur.blankName : null;
+      var filled = filledByStep[i] || {};
+      // Steps not yet reached stay blank so they do not give the game away.
+      var body = (i <= cur.stepIndex)
+        ? renderTemplate(step.template, step.blanks, active, filled)
+        : '';
+      li.innerHTML = '<div class="say">' + escapeHtml(step.say) + '</div>' +
+                     '<div class="line">' + body + '</div>';
+      ol.appendChild(li);
+    }
+
+    var fb = el('feedback');
+    fb.textContent = feedback || '';
+    fb.className = tone || '';
+
+    var input = el('answer');
+    if (input) {
+      input.focus();
+      input.onkeydown = function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); onSubmit(input.value); }
+      };
+    }
+  }
+
+  function onSubmit(text) {
+    var cur = session.current();
+    if (!cur) return;
+    var stepIndex = cur.stepIndex, name = cur.blankName;
+    var result = session.submit(text);
+
+    if (result.status === 'unreduced') {
+      renderQuiz('Right value — now simplify it completely.', 'bad'); return;
+    }
+    if (result.status === 'malformed') {
+      renderQuiz('Type an answer first.', 'bad'); return;
+    }
+    if (result.status === 'correct' || result.status === 'revealed') {
+      filledByStep[stepIndex] = filledByStep[stepIndex] || {};
+      filledByStep[stepIndex][name] = {
+        text: result.status === 'revealed'
+              ? String(cur.problem.steps[stepIndex].blanks[name]) : text,
+        shown: result.status === 'revealed'
+      };
+    }
+    if (result.status === 'correct') {
+      if (session.current() && session.current().problem !== cur.problem) {
+        filledByStep = {};
+      }
+      renderQuiz('', 'good'); return;
+    }
+    if (result.status === 'wrong') {
+      renderQuiz(result.hint || 'Not quite — try that step again.', 'bad'); return;
+    }
+    if (result.status === 'revealed') {
+      if (session.current() && session.current().problem !== cur.problem) {
+        filledByStep = {};
+      }
+      renderQuiz(result.hint, 'bad'); return;
+    }
+    renderDone();
+  }
+
+  function renderDone() {
+    progress = loadProgress();
+    var missed = session.missed();
+    var seen = {};
+    for (var i = 0; i < missed.length; i++) { seen[missed[i].problem.id] = missed[i].problem; }
+    // Replay each finished problem so the stored streak matches the one the
+    // session used, instead of collapsing a whole session into one result.
+    var finished = session.results();
+    for (var r = 0; r < finished.length; r++) {
+      progress = recordResult(progress, finished[r].type,
+                              finished[r].problemId, finished[r].clean);
+    }
+    saveProgress(progress);
+
+    el('done-title').textContent = missed.length === 0 ? 'Clean sweep' : 'Session complete';
+    el('done-score').textContent = 'Score: ' + session.score();
+    var rl = el('review-list');
+    rl.innerHTML = '';
+    for (var id in seen) {
+      if (seen.hasOwnProperty(id)) {
+        var li = document.createElement('li');
+        li.textContent = seen[id].prompt + '  →  ' + describeAnswer(seen[id].answer);
+        rl.appendChild(li);
+      }
+    }
+    show('quiz-screen', false); show('done-screen', true);
+  }
+
+  function describeAnswer(a) {
+    if (a.kind === 'fraction') return a.num + '/' + a.den;
+    if (a.kind === 'radical') return (a.coef === 1 ? '' : a.coef) + '√' + a.rad;
+    if (a.kind === 'pair') return '(' + a.x + ', ' + a.y + ')';
+    if (a.kind === 'signs') return '(' + a.x + ', ' + a.y + ')';
+    return String(a.value);
+  }
+
+  function startApp() {
+    el('start-mock').onclick = function () { begin(createMockTest()); };
+    el('back-to-menu').onclick = function (e) { e.preventDefault(); renderMenu(); };
+    el('again').onclick = function () { renderMenu(); };
+    renderMenu();
+  }
+
+  globalThis.renderTemplate = renderTemplate;
+  globalThis.startApp = startApp;
+})();
+
+document.addEventListener('DOMContentLoaded', function () { startApp(); });
+</script>
+</body>
+</html>

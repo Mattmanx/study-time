@@ -5,3 +5,4 @@ generators.js
 hints.js
 storage.js
 session.js
+views.js
