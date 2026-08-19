@@ -38,6 +38,20 @@
     });
   }
 
+  // The answer key writes the operation under each side with a rule beneath,
+  // then the new equation. Steps that only rewrite ("Distribute the 2") carry
+  // no opL/opR and get no row.
+  function renderOpRow(step, activeName, filled) {
+    if (!step.blanks.hasOwnProperty('opL')) return '';
+    function cell(name) {
+      return '<span class="opcell">' +
+             renderTemplate('{' + name + '}', step.blanks, activeName, filled) +
+             '</span>';
+    }
+    return '<div class="oprow">' + cell('opL') + cell('opR') + '</div>' +
+           '<div class="oprule"></div>';
+  }
+
   var session = null, progress = null, filledByStep = {};
 
   function loadProgress() {
@@ -114,6 +128,7 @@
       var active = (i === cur.stepIndex) ? cur.blankName : null;
       var filled = filledByStep[i] || {};
       li.innerHTML = '<div class="say">' + escapeHtml(step.say) + '</div>' +
+                     renderOpRow(step, active, filled) +
                      '<div class="line">' +
                      renderTemplate(step.template, step.blanks, active, filled) +
                      '</div>';

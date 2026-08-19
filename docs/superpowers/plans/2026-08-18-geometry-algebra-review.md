@@ -585,7 +585,11 @@ for (var i = 0; i < PROBLEMS.length; i++) {
     var step = p.steps[s];
     var tokens = (step.template.match(/\{(\w+)\}/g) || [])
                    .map(function (t) { return t.slice(1, -1); });
-    var keys = Object.keys(step.blanks);
+    // opL/opR are rendered as their own row above the result, not as template
+    // tokens, so they are excluded from this correspondence check.
+    var keys = Object.keys(step.blanks).filter(function (k) {
+      return k !== 'opL' && k !== 'opR';
+    });
     if (tokens.length !== keys.length) { badTemplate += 1; continue; }
     for (var t = 0; t < tokens.length; t++) {
       if (!(tokens[t] in step.blanks)) badTemplate += 1;
@@ -616,13 +620,33 @@ var broken = {
 };
 check('walker catches a wrong final blank', walkProblem(broken).ok, false);
 
-var twoBlanks = {
-  id: 'two', type: 'equation', source: 'test', prompt: '2n = 4',
+// A step may carry operation blanks before its result. The contract is that
+// the LAST blank is the answer, not that there is only one.
+var opThenResult = {
+  id: 'ops', type: 'equation', source: 'test', prompt: '2n = 4',
   answer: { kind: 'int', value: 2 },
   verify: function (n) { return 2 * n === 4; },
-  steps: [{ say: 'x', template: '{a} = {b}', blanks: { a: 2, b: 2 } }]
+  steps: [{ say: 'Divide both sides by 2:', template: 'n = {a}',
+            blanks: { opL: '÷2', opR: '÷2', a: 2 } }]
 };
-check('walker rejects a multi-blank final step', walkProblem(twoBlanks).ok, false);
+check('walker accepts op blanks before the result', walkProblem(opThenResult).ok, true);
+
+var opsBadResult = {
+  id: 'ops-bad', type: 'equation', source: 'test', prompt: '2n = 4',
+  answer: { kind: 'int', value: 2 },
+  verify: function (n) { return 2 * n === 4; },
+  steps: [{ say: 'Divide both sides by 2:', template: 'n = {a}',
+            blanks: { opL: '÷2', opR: '÷2', a: 99 } }]
+};
+check('walker still catches a wrong result blank', walkProblem(opsBadResult).ok, false);
+
+var noBlanks = {
+  id: 'none', type: 'equation', source: 'test', prompt: '2n = 4',
+  answer: { kind: 'int', value: 2 },
+  verify: function (n) { return 2 * n === 4; },
+  steps: [{ say: 'x', template: 'n', blanks: {} }]
+};
+check('walker rejects a final step with no blank', walkProblem(noBlanks).ok, false);
 
 // --- the 14 equations are all present and answer-key-verified
 var eq = PROBLEMS.filter(function (p) { return p.type === 'equation'; });
@@ -1174,7 +1198,11 @@ for (var t = 0; t < TYPES.length; t++) {
     }
     for (var s = 0; s < p.steps.length; s++) {
       var toks = (p.steps[s].template.match(/\{(\w+)\}/g) || []).length;
-      if (toks !== Object.keys(p.steps[s].blanks).length) badTemplate += 1;
+      // opL/opR render as their own row, not as template tokens.
+      var bk = Object.keys(p.steps[s].blanks).filter(function (k) {
+        return k !== 'opL' && k !== 'opR';
+      }).length;
+      if (toks !== bk) badTemplate += 1;
     }
     if (NEEDS_FIGURE[TYPES[t]] && !p.figure) missingFigure += 1;
   }
@@ -1649,9 +1677,12 @@ for (var gs = 1; gs <= 200 && !genFired; gs++) {
     var gm = gp.steps[0].say.match(/add (\d+)([a-z]) to both sides/i);
     if (!gm) continue;
     genChecked += 1;
-    var want = gp.steps[0].blanks[Object.keys(gp.steps[0].blanks)[0]];
+    // The coefficient blank is the LAST one; opL/opR come first.
+    var gkeys = Object.keys(gp.steps[0].blanks);
+    var gk = gkeys[gkeys.length - 1];
+    var want = gp.steps[0].blanks[gk];
     var wrong = want - 2 * parseInt(gm[1], 10);
-    if (hintFor(ctx(gp, 0, Object.keys(gp.steps[0].blanks)[0], String(wrong)))) {
+    if (hintFor(ctx(gp, 0, gk, String(wrong)))) {
       genFired = true; break;
     }
   }
@@ -2074,13 +2105,18 @@ function drill7() {
 }
 
 // --- correct answers walk the chain and finish the problem
+// p1-7 blanks in order: [14] then (+14,+14,0) then (÷2,÷2,0).
 var d = drill7();
 check('starts at step 0', d.current().stepIndex, 0);
 check('step 0 correct', d.submit('14').status, 'correct');
 check('advanced to step 1', d.current().stepIndex, 1);
-check('step 1 correct', d.submit('0').status, 'correct');
-check('step 2 correct', d.submit('0').status, 'correct');
-check('problem complete', d.submit('14').advanced !== undefined, true);
+check('left op correct', d.submit('+14').status, 'correct');
+check('right op correct', d.submit('+14').status, 'correct');
+check('step 1 result correct', d.submit('0').status, 'correct');
+check('advanced to step 2', d.current().stepIndex, 2);
+check('divide op accepts slash', d.submit('/2').status, 'correct');
+check('divide op accepts unicode', d.submit('÷2').status, 'correct');
+check('step 2 result correct', d.submit('0').status, 'correct');
 
 // --- a wrong answer retries the same blank, then reveals
 var d2 = drill7();
@@ -2093,7 +2129,8 @@ check('reveal advances', d2.current().stepIndex, 1);
 
 // --- the zero-quotient hint reaches the student through the session
 var d3 = drill7();
-d3.submit('14'); d3.submit('0');
+d3.submit('14'); d3.submit('+14'); d3.submit('+14'); d3.submit('0');
+d3.submit('÷2'); d3.submit('÷2');
 var r3 = d3.submit('2');
 check('hint delivered', r3.hint.indexOf('is 0') !== -1, true);
 
@@ -2109,7 +2146,7 @@ check('accepts the reduced form', d4.submit('27/20').status, 'correct');
 
 // --- malformed input costs nothing either
 var d5 = drill7();
-check('malformed status', d5.submit('???').status, 'malformed');
+check('malformed status', d5.submit('').status, 'malformed');
 check('malformed does not advance', d5.current().stepIndex, 0);
 check('still on first attempt', d5.submit('12').status, 'wrong');
 
@@ -2481,6 +2518,11 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
 .line .filled { color: var(--ok); font-weight: 600; }
 .line .shown { color: var(--no); font-weight: 600; }
 .line .todo { opacity: .4; }
+.oprow { display: flex; gap: 3rem; font-size: 1.15rem; margin: .15rem 0; }
+.opcell { min-width: 4.5rem; text-align: center; }
+.opcell input { width: 4rem; }
+.oprule { border-top: 1.5px solid currentColor; opacity: .5;
+          max-width: 14rem; margin: .1rem 0 .35rem; }
 #steps li.more { opacity: .4; font-size: .85rem; font-style: italic; }
 #controls { margin: .5rem 0 1rem; }
 #feedback { min-height: 3rem; }
@@ -2536,6 +2578,20 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
   // Replaced by the real implementation in Task 10. Until then, figures
   // render as nothing rather than throwing.
   function renderFigure() { return ''; }
+
+  // The answer key writes the operation under each side with a rule beneath,
+  // then the new equation. Steps that only rewrite ("Distribute the 2") carry
+  // no opL/opR and get no row.
+  function renderOpRow(step, activeName, filled) {
+    if (!step.blanks.hasOwnProperty('opL')) return '';
+    function cell(name) {
+      return '<span class="opcell">' +
+             renderTemplate('{' + name + '}', step.blanks, activeName, filled) +
+             '</span>';
+    }
+    return '<div class="oprow">' + cell('opL') + cell('opR') + '</div>' +
+           '<div class="oprule"></div>';
+  }
 
   var session = null, progress = null, filledByStep = {};
 
@@ -2613,6 +2669,7 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
       var active = (i === cur.stepIndex) ? cur.blankName : null;
       var filled = filledByStep[i] || {};
       li.innerHTML = '<div class="say">' + escapeHtml(step.say) + '</div>' +
+                     renderOpRow(step, active, filled) +
                      '<div class="line">' +
                      renderTemplate(step.template, step.blanks, active, filled) +
                      '</div>';

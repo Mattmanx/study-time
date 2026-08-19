@@ -16,7 +16,11 @@ for (var i = 0; i < PROBLEMS.length; i++) {
     var step = p.steps[s];
     var tokens = (step.template.match(/\{(\w+)\}/g) || [])
                    .map(function (t) { return t.slice(1, -1); });
-    var keys = Object.keys(step.blanks);
+    // opL/opR are rendered as their own row above the result, not as template
+    // tokens, so they are excluded from this correspondence check.
+    var keys = Object.keys(step.blanks).filter(function (k) {
+      return k !== 'opL' && k !== 'opR';
+    });
     if (tokens.length !== keys.length) { badTemplate += 1; continue; }
     for (var t = 0; t < tokens.length; t++) {
       if (!(tokens[t] in step.blanks)) badTemplate += 1;
@@ -47,13 +51,33 @@ var broken = {
 };
 check('walker catches a wrong final blank', walkProblem(broken).ok, false);
 
-var twoBlanks = {
-  id: 'two', type: 'equation', source: 'test', prompt: '2n = 4',
+// A step may carry operation blanks before its result. The contract is that
+// the LAST blank is the answer, not that there is only one.
+var opThenResult = {
+  id: 'ops', type: 'equation', source: 'test', prompt: '2n = 4',
   answer: { kind: 'int', value: 2 },
   verify: function (n) { return 2 * n === 4; },
-  steps: [{ say: 'x', template: '{a} = {b}', blanks: { a: 2, b: 2 } }]
+  steps: [{ say: 'Divide both sides by 2:', template: 'n = {a}',
+            blanks: { opL: '÷2', opR: '÷2', a: 2 } }]
 };
-check('walker rejects a multi-blank final step', walkProblem(twoBlanks).ok, false);
+check('walker accepts op blanks before the result', walkProblem(opThenResult).ok, true);
+
+var opsBadResult = {
+  id: 'ops-bad', type: 'equation', source: 'test', prompt: '2n = 4',
+  answer: { kind: 'int', value: 2 },
+  verify: function (n) { return 2 * n === 4; },
+  steps: [{ say: 'Divide both sides by 2:', template: 'n = {a}',
+            blanks: { opL: '÷2', opR: '÷2', a: 99 } }]
+};
+check('walker still catches a wrong result blank', walkProblem(opsBadResult).ok, false);
+
+var noBlanks = {
+  id: 'none', type: 'equation', source: 'test', prompt: '2n = 4',
+  answer: { kind: 'int', value: 2 },
+  verify: function (n) { return 2 * n === 4; },
+  steps: [{ say: 'x', template: 'n', blanks: {} }]
+};
+check('walker rejects a final step with no blank', walkProblem(noBlanks).ok, false);
 
 // --- the 14 equations are all present and answer-key-verified
 var eq = PROBLEMS.filter(function (p) { return p.type === 'equation'; });

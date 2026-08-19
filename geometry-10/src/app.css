@@ -41,6 +41,11 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
 .line .filled { color: var(--ok); font-weight: 600; }
 .line .shown { color: var(--no); font-weight: 600; }
 .line .todo { opacity: .4; }
+.oprow { display: flex; gap: 3rem; font-size: 1.15rem; margin: .15rem 0; }
+.opcell { min-width: 4.5rem; text-align: center; }
+.opcell input { width: 4rem; }
+.oprule { border-top: 1.5px solid currentColor; opacity: .5;
+          max-width: 14rem; margin: .1rem 0 .35rem; }
 #steps li.more { opacity: .4; font-size: .85rem; font-style: italic; }
 #controls { margin: .5rem 0 1rem; }
 #feedback { min-height: 3rem; }

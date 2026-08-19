@@ -31,7 +31,11 @@ for (var t = 0; t < TYPES.length; t++) {
     }
     for (var s = 0; s < p.steps.length; s++) {
       var toks = (p.steps[s].template.match(/\{(\w+)\}/g) || []).length;
-      if (toks !== Object.keys(p.steps[s].blanks).length) badTemplate += 1;
+      // opL/opR render as their own row, not as template tokens.
+      var bk = Object.keys(p.steps[s].blanks).filter(function (k) {
+        return k !== 'opL' && k !== 'opR';
+      }).length;
+      if (toks !== bk) badTemplate += 1;
     }
     if (NEEDS_FIGURE[TYPES[t]] && !p.figure) missingFigure += 1;
   }

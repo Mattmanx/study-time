@@ -42,9 +42,12 @@ for (var gs = 1; gs <= 200 && !genFired; gs++) {
     var gm = gp.steps[0].say.match(/add (\d+)([a-z]) to both sides/i);
     if (!gm) continue;
     genChecked += 1;
-    var want = gp.steps[0].blanks[Object.keys(gp.steps[0].blanks)[0]];
+    // The coefficient blank is the LAST one; opL/opR come first.
+    var gkeys = Object.keys(gp.steps[0].blanks);
+    var gk = gkeys[gkeys.length - 1];
+    var want = gp.steps[0].blanks[gk];
     var wrong = want - 2 * parseInt(gm[1], 10);
-    if (hintFor(ctx(gp, 0, Object.keys(gp.steps[0].blanks)[0], String(wrong)))) {
+    if (hintFor(ctx(gp, 0, gk, String(wrong)))) {
       genFired = true; break;
     }
   }

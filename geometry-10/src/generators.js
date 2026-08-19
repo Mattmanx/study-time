@@ -18,6 +18,14 @@
 
   // "Subtract −2a from both sides" is exactly the confusion this tool exists
   // to fix. Say the move the way a teacher would: a negative term is added.
+  // The mark written under each side on paper: +1, -5, x14, /-9.
+  function opMark(n, tail) {
+    tail = tail || '';
+    return (n < 0 ? '+' + (-n) : '-' + n) + tail;
+  }
+  function divMark(n) { return '÷' + n; }
+  function mulMark(n) { return '×' + n; }
+
   function undo(n, tail) {
     tail = tail || '';
     return n < 0 ? 'Add ' + (-n) + tail + ' to both sides:'
@@ -110,8 +118,10 @@
         answer: { kind: 'int', value: ans },
         verify: function (x) { return a * x + b === c; },
         steps: [
-          { say: undo(b), template: sign(a) + v + ' = {p}', blanks: { p: c - b } },
-          { say: 'Divide both sides by ' + a + ':', template: v + ' = {q}', blanks: { q: ans } }
+          { say: undo(b), template: sign(a) + v + ' = {p}',
+            blanks: { opL: opMark(b), opR: opMark(b), p: c - b } },
+          { say: 'Divide both sides by ' + a + ':', template: v + ' = {q}',
+            blanks: { opL: divMark(a), opR: divMark(a), q: ans } }
         ]
       };
     }
@@ -125,8 +135,10 @@
         verify: function (x) { return a2 * (x + b2) === c2; },
         steps: [
           { say: 'Distribute the ' + a2 + ':', template: sign(a2) + v + ' ' + plus(a2 * b2) + ' = ' + sign(c2), blanks: {} },
-          { say: undo(a2 * b2), template: sign(a2) + v + ' = {p}', blanks: { p: c2 - a2 * b2 } },
-          { say: 'Divide both sides by ' + a2 + ':', template: v + ' = {q}', blanks: { q: ans } }
+          { say: undo(a2 * b2), template: sign(a2) + v + ' = {p}',
+            blanks: { opL: opMark(a2 * b2), opR: opMark(a2 * b2), p: c2 - a2 * b2 } },
+          { say: 'Divide both sides by ' + a2 + ':', template: v + ' = {q}',
+            blanks: { opL: divMark(a2), opR: divMark(a2), q: ans } }
         ]
       };
     }
@@ -142,10 +154,13 @@
         verify: function (x) { return a3 * x + b3 === c3 * x + d3; },
         steps: [
           { say: 'Move the variable terms together — ' + undo(c3, v).charAt(0).toLowerCase() + undo(c3, v).slice(1),
-            template: '{p}' + v + ' ' + plus(b3) + ' = ' + sign(d3), blanks: { p: a3 - c3 } },
+            template: '{p}' + v + ' ' + plus(b3) + ' = ' + sign(d3),
+            blanks: { opL: opMark(c3, v), opR: opMark(c3, v), p: a3 - c3 } },
           { say: undo(b3),
-            template: sign(a3 - c3) + v + ' = {q}', blanks: { q: d3 - b3 } },
-          { say: 'Divide both sides by ' + (a3 - c3) + ':', template: v + ' = {r}', blanks: { r: ans } }
+            template: sign(a3 - c3) + v + ' = {q}',
+            blanks: { opL: opMark(b3), opR: opMark(b3), q: d3 - b3 } },
+          { say: 'Divide both sides by ' + (a3 - c3) + ':', template: v + ' = {r}',
+            blanks: { opL: divMark(a3 - c3), opR: divMark(a3 - c3), r: ans } }
         ]
       };
     }
@@ -160,8 +175,10 @@
       answer: { kind: 'int', value: ans4 },
       verify: function (x) { return x / d4 + b4 === c4; },
       steps: [
-        { say: undo(b4), template: v + '/' + d4 + ' = {p}', blanks: { p: c4 - b4 } },
-        { say: 'Multiply both sides by ' + d4 + ':', template: v + ' = {q}', blanks: { q: ans4 } }
+        { say: undo(b4), template: v + '/' + d4 + ' = {p}',
+          blanks: { opL: opMark(b4), opR: opMark(b4), p: c4 - b4 } },
+        { say: 'Multiply both sides by ' + d4 + ':', template: v + ' = {q}',
+          blanks: { opL: mulMark(d4), opR: mulMark(d4), q: ans4 } }
       ]
     };
   }

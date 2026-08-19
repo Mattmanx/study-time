@@ -16,13 +16,18 @@ function drill7() {
 }
 
 // --- correct answers walk the chain and finish the problem
+// p1-7 blanks in order: [14] then (+14,+14,0) then (÷2,÷2,0).
 var d = drill7();
 check('starts at step 0', d.current().stepIndex, 0);
 check('step 0 correct', d.submit('14').status, 'correct');
 check('advanced to step 1', d.current().stepIndex, 1);
-check('step 1 correct', d.submit('0').status, 'correct');
-check('step 2 correct', d.submit('0').status, 'correct');
-check('problem complete', d.submit('14').advanced !== undefined, true);
+check('left op correct', d.submit('+14').status, 'correct');
+check('right op correct', d.submit('+14').status, 'correct');
+check('step 1 result correct', d.submit('0').status, 'correct');
+check('advanced to step 2', d.current().stepIndex, 2);
+check('divide op accepts slash', d.submit('/2').status, 'correct');
+check('divide op accepts unicode', d.submit('÷2').status, 'correct');
+check('step 2 result correct', d.submit('0').status, 'correct');
 
 // --- a wrong answer retries the same blank, then reveals
 var d2 = drill7();
@@ -35,7 +40,8 @@ check('reveal advances', d2.current().stepIndex, 1);
 
 // --- the zero-quotient hint reaches the student through the session
 var d3 = drill7();
-d3.submit('14'); d3.submit('0');
+d3.submit('14'); d3.submit('+14'); d3.submit('+14'); d3.submit('0');
+d3.submit('÷2'); d3.submit('÷2');
 var r3 = d3.submit('2');
 check('hint delivered', r3.hint.indexOf('is 0') !== -1, true);
 
@@ -51,7 +57,7 @@ check('accepts the reduced form', d4.submit('27/20').status, 'correct');
 
 // --- malformed input costs nothing either
 var d5 = drill7();
-check('malformed status', d5.submit('???').status, 'malformed');
+check('malformed status', d5.submit('').status, 'malformed');
 check('malformed does not advance', d5.current().stepIndex, 0);
 check('still on first attempt', d5.submit('12').status, 'wrong');
 

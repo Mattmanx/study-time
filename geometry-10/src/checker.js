@@ -76,6 +76,20 @@
     return { status: (r.coef === spec.coef && r.rad === spec.rad) ? 'correct' : 'wrong' };
   }
 
+  // Operation notation: a keyboard has no ÷ or ×, so accept what it offers.
+  function normalizeOp(text) {
+    return normalize(text).toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/[*x]/g, '×')
+      .replace(/\//g, '÷');
+  }
+
+  function checkOp(text, spec) {
+    var s = normalizeOp(text);
+    if (s === '') return { status: 'malformed' };
+    return { status: s === spec.value ? 'correct' : 'wrong' };
+  }
+
   function checkSigns(text, spec) {
     var s = normalize(text).replace(/[()\s]/g, '');
     var parts = s.split(',');
@@ -109,6 +123,7 @@
       if (p === null) return { status: 'malformed' };
       return { status: (p.x === spec.x && p.y === spec.y) ? 'correct' : 'wrong' };
     }
+    if (spec.kind === 'op') return checkOp(text, spec);
     if (spec.kind === 'decimal2') return checkDecimal2(text, spec);
     if (spec.kind === 'radical') return checkRadical(text, spec);
     if (spec.kind === 'signs') return checkSigns(text, spec);
@@ -130,6 +145,7 @@
       }
       return { kind: 'label', value: s };
     }
+    if (/^[×÷*\/]/.test(s)) return { kind: 'op', value: normalizeOp(s) };
     var r = parseRadical(s);
     if (r) return { kind: 'radical', coef: r.coef, rad: r.rad };
     if (s.indexOf('/') !== -1) {
@@ -138,6 +154,7 @@
     }
     if (/^[+-]?\d+\.\d+$/.test(s)) return { kind: 'decimal2', value: parseFloat(s) };
     if (/^[+-]?\d+$/.test(s)) return { kind: 'int', value: parseInt(s, 10) };
+    if (/^[+-]\d+[a-z]$/i.test(s)) return { kind: 'op', value: normalizeOp(s) };
     return { kind: 'label', value: s };
   }
 
