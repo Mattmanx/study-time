@@ -1253,6 +1253,14 @@ An empty file still proves nothing is implemented. Without it, `load('src/genera
     };
   }
 
+  // "Subtract −2a from both sides" is exactly the confusion this tool exists
+  // to fix. Say the move the way a teacher would: a negative term is added.
+  function undo(n, tail) {
+    tail = tail || '';
+    return n < 0 ? 'Add ' + (-n) + tail + ' to both sides:'
+                 : 'Subtract ' + n + tail + ' from both sides:';
+  }
+
   function pick(rng, list) { return list[Math.floor(rng() * list.length)]; }
   function between(rng, lo, hi) { return lo + Math.floor(rng() * (hi - lo + 1)); }
   function nonZero(rng, lo, hi) {
@@ -1339,7 +1347,7 @@ An empty file still proves nothing is implemented. Without it, `load('src/genera
         answer: { kind: 'int', value: ans },
         verify: function (x) { return a * x + b === c; },
         steps: [
-          { say: 'Subtract ' + b + ' from both sides:', template: sign(a) + v + ' = {p}', blanks: { p: c - b } },
+          { say: undo(b), template: sign(a) + v + ' = {p}', blanks: { p: c - b } },
           { say: 'Divide both sides by ' + a + ':', template: v + ' = {q}', blanks: { q: ans } }
         ]
       };
@@ -1354,7 +1362,7 @@ An empty file still proves nothing is implemented. Without it, `load('src/genera
         verify: function (x) { return a2 * (x + b2) === c2; },
         steps: [
           { say: 'Distribute the ' + a2 + ':', template: sign(a2) + v + ' ' + plus(a2 * b2) + ' = ' + sign(c2), blanks: {} },
-          { say: 'Subtract ' + (a2 * b2) + ' from both sides:', template: sign(a2) + v + ' = {p}', blanks: { p: c2 - a2 * b2 } },
+          { say: undo(a2 * b2), template: sign(a2) + v + ' = {p}', blanks: { p: c2 - a2 * b2 } },
           { say: 'Divide both sides by ' + a2 + ':', template: v + ' = {q}', blanks: { q: ans } }
         ]
       };
@@ -1370,9 +1378,9 @@ An empty file still proves nothing is implemented. Without it, `load('src/genera
         answer: { kind: 'int', value: ans },
         verify: function (x) { return a3 * x + b3 === c3 * x + d3; },
         steps: [
-          { say: 'Move the variable terms together — subtract ' + c3 + v + ' from both sides:',
+          { say: 'Move the variable terms together — ' + undo(c3, v).charAt(0).toLowerCase() + undo(c3, v).slice(1),
             template: '{p}' + v + ' ' + plus(b3) + ' = ' + sign(d3), blanks: { p: a3 - c3 } },
-          { say: 'Subtract ' + b3 + ' from both sides:',
+          { say: undo(b3),
             template: sign(a3 - c3) + v + ' = {q}', blanks: { q: d3 - b3 } },
           { say: 'Divide both sides by ' + (a3 - c3) + ':', template: v + ' = {r}', blanks: { r: ans } }
         ]
@@ -1389,7 +1397,7 @@ An empty file still proves nothing is implemented. Without it, `load('src/genera
       answer: { kind: 'int', value: ans4 },
       verify: function (x) { return x / d4 + b4 === c4; },
       steps: [
-        { say: 'Subtract ' + b4 + ' from both sides:', template: v + '/' + d4 + ' = {p}', blanks: { p: c4 - b4 } },
+        { say: undo(b4), template: v + '/' + d4 + ' = {p}', blanks: { p: c4 - b4 } },
         { say: 'Multiply both sides by ' + d4 + ':', template: v + ' = {q}', blanks: { q: ans4 } }
       ]
     };
