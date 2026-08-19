@@ -41,6 +41,8 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
 .line .filled { color: var(--ok); font-weight: 600; }
 .line .shown { color: var(--no); font-weight: 600; }
 .line .todo { opacity: .4; }
+#steps li.more { opacity: .4; font-size: .85rem; font-style: italic; }
+#controls { margin: .5rem 0 1rem; }
 #feedback { min-height: 3rem; }
 #feedback.bad { color: var(--no); }
 #feedback.good { color: var(--ok); }

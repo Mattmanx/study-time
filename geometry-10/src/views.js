@@ -108,19 +108,26 @@
 
     var ol = el('steps');
     ol.innerHTML = '';
-    for (var i = 0; i < p.steps.length; i++) {
+    // Only steps already reached are rendered at all. Listing the remaining
+    // instructions would hand over the method, and choosing the next
+    // operation is itself what the test asks for.
+    for (var i = 0; i <= cur.stepIndex && i < p.steps.length; i++) {
       var step = p.steps[i];
       var li = document.createElement('li');
-      li.className = i < cur.stepIndex ? 'past' : (i === cur.stepIndex ? 'active' : '');
+      li.className = i < cur.stepIndex ? 'past' : 'active';
       var active = (i === cur.stepIndex) ? cur.blankName : null;
       var filled = filledByStep[i] || {};
-      // Steps not yet reached stay blank so they do not give the game away.
-      var body = (i <= cur.stepIndex)
-        ? renderTemplate(step.template, step.blanks, active, filled)
-        : '';
       li.innerHTML = '<div class="say">' + escapeHtml(step.say) + '</div>' +
-                     '<div class="line">' + body + '</div>';
+                     '<div class="line">' +
+                     renderTemplate(step.template, step.blanks, active, filled) +
+                     '</div>';
       ol.appendChild(li);
+    }
+    if (cur.stepIndex + 1 < p.steps.length) {
+      var more = document.createElement('li');
+      more.className = 'more';
+      more.textContent = 'next step appears when this one is right';
+      ol.appendChild(more);
     }
 
     var fb = el('feedback');
@@ -128,12 +135,17 @@
     fb.className = tone || '';
 
     var input = el('answer');
+    var check = el('check');
     if (input) {
       input.focus();
       input.onkeydown = function (e) {
         if (e.key === 'Enter') { e.preventDefault(); onSubmit(input.value); }
       };
+      // Enter alone is fine on a laptop, but there is no comfortable Enter
+      // key on a tablet.
+      check.onclick = function () { onSubmit(input.value); };
     }
+    show('controls', input !== null);
   }
 
   function onSubmit(text) {
