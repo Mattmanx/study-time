@@ -290,10 +290,23 @@
     'exponent': genExponent
   };
 
+  // djb2, enough to tell two prompts apart.
+  function slug(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) { h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; }
+    return h.toString(36);
+  }
+
   function generate(type, rng) {
     var fn = BY_TYPE[type];
     if (!fn) throw new Error('unknown problem type: ' + type);
-    return fn(rng);
+    var p = fn(rng);
+    // The review list dedups by id. Without this, every generated equation
+    // shares the id 'gen-eq1' and a session that missed three different ones
+    // would show a single row, silently dropping two problems the student
+    // needs to see again. Same prompt still means same id, which is right.
+    p.id = p.id + '-' + slug(p.prompt);
+    return p;
   }
 
   globalThis.TYPES = TYPES;

@@ -62,6 +62,16 @@ for (var m = 0; m < 100; m++) {
 }
 check('equation answers are integers', nonInteger, 0);
 
+// --- distinct problems must get distinct ids, or the end-of-session review
+// list silently collapses several missed problems into one row.
+var rngId = makeRng(5), byPrompt = {}, byId = {};
+for (var q = 0; q < 200; q++) {
+  var gp = generate('equation', rngId);
+  byPrompt[gp.prompt] = 1; byId[gp.id] = 1;
+}
+check('one id per distinct problem',
+      Object.keys(byId).length, Object.keys(byPrompt).length);
+
 // --- radical-exact must never generate an already-simplified radical,
 // otherwise the question teaches nothing.
 var rng4 = makeRng(13), trivial = 0;
