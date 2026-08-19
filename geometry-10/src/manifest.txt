@@ -1,1 +1,2 @@
-# JS modules, in load order. Filled in by later tasks.
+# JS modules, in load order: data and pure logic before the views that use them.
+checker.js
