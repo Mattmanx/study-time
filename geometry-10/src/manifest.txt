@@ -1,2 +1,3 @@
 # JS modules, in load order: data and pure logic before the views that use them.
 checker.js
+problems.js
