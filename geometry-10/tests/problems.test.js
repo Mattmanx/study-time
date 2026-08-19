@@ -80,4 +80,41 @@ check('p2-7', byId('p2-7').answer.value, -2);
 check('p2-8', byId('p2-8').answer.value, -5);
 check('p2-9 is zero', byId('p2-9').answer.value, 0);
 
+// --- the remaining types, all answer-key-verified
+check('total count', PROBLEMS.length, 35);
+function ofType(t) {
+  return PROBLEMS.filter(function (p) { return p.type === t; }).length;
+}
+check('evaluate count', ofType('evaluate'), 4);
+check('fraction count', ofType('fraction'), 4);
+check('radical-calc count', ofType('radical-calc'), 4);
+check('radical-exact count', ofType('radical-exact'), 3);
+check('exponent count', ofType('exponent'), 6);
+
+// The two evaluate problems the student got wrong -- both subtracting a negative.
+check('p1-10', byId('p1-10').answer.value, -9);
+check('p1-11', byId('p1-11').answer.value, -1);
+check('p2-10a', byId('p2-10a').answer.value, -16);
+check('p2-10b', byId('p2-10b').answer.value, -78);
+
+check('p1-12 num', byId('p1-12').answer.num, 27);
+check('p1-12 den', byId('p1-12').answer.den, 20);
+check('p1-13 num', byId('p1-13').answer.num, 6);
+check('p1-13 den', byId('p1-13').answer.den, 5);
+check('p2-11 num', byId('p2-11').answer.num, 3);
+check('p2-12 num', byId('p2-12').answer.num, 4);
+check('p2-12 den', byId('p2-12').answer.den, 21);
+
+check('p1-14 decimal', byId('p1-14').answer.value, 15.81);
+check('p1-16 coef', byId('p1-16').answer.coef, 5);
+check('p1-16 rad', byId('p1-16').answer.rad, 10);
+check('p1-17 coef', byId('p1-17').answer.coef, 2);
+check('p2-15 rad', byId('p2-15').answer.rad, 21);
+
+// -6^2 is negative but (-17)^2 is positive -- the distinction IS the item.
+check('p1-20 is negative', byId('p1-20').answer.value, -36);
+check('p1-19 is positive', byId('p1-19').answer.value, 289);
+check('p2-17 is negative', byId('p2-17').answer.value, -225);
+check('p2-18 is positive', byId('p2-18').answer.value, 576);
+
 done('problems');

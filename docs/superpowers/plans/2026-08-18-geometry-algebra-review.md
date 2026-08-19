@@ -558,6 +558,8 @@ study guides."
 
   A step may declare `blanks: {}`. That is a **display-only step** — it shows a transformation without asking for input. Only the final step is required to have exactly one blank.
 
+  **The final step's single blank must hold the entire answer, not a piece of it.** `walkProblem` grades `String(finalBlank)` against the whole `answer` spec, so a chain ending in `template: '{b}√10', blanks: { b: 5 }` fails — `'5'` is not a radical. Answer kinds with several fields (`radical`, `pair`, `fraction`, `signs`) need a closing step whose blank is the complete written answer: `'5√10'`, `'(0,-2)'`, `'27/20'`, `'-,+'`. That closing step earns its place anyway — it is what the student writes on the test.
+
 **Why `verify` exists:** it is an independent arithmetic check that the transcription from the PDF is right. The step chain could be internally consistent and still describe the wrong problem; `verify` catches that by substituting the answer back into the printed equation.
 
 - [ ] **Step 1: Write the failing test**
@@ -1027,7 +1029,8 @@ In `geometry-10/src/problems.js`, insert these entries into the `PROBLEMS` array
       verify: function (a) { return Math.abs(a.coef * Math.sqrt(a.rad) - Math.sqrt(250)) < 1e-9; },
       steps: [
         { say: 'Find the largest perfect square that divides 250:', template: '√250 = √({a} · 10)', blanks: { a: 25 } },
-        { say: 'Take the square root of 25 out front:', template: '{b}√10', blanks: { b: 5 } }
+        { say: 'Take the square root of 25 out front:', template: '{b}√10', blanks: { b: 5 } },
+        { say: 'Write the complete simplified answer:', template: '{c}', blanks: { c: '5√10' } }
       ] },
 
     { id: 'p1-17', type: 'radical-exact', source: 'P1 #17', prompt: '√56',
@@ -1035,7 +1038,8 @@ In `geometry-10/src/problems.js`, insert these entries into the `PROBLEMS` array
       verify: function (a) { return Math.abs(a.coef * Math.sqrt(a.rad) - Math.sqrt(56)) < 1e-9; },
       steps: [
         { say: 'Find the largest perfect square that divides 56:', template: '√56 = √({a} · 14)', blanks: { a: 4 } },
-        { say: 'Take the square root of 4 out front:', template: '{b}√14', blanks: { b: 2 } }
+        { say: 'Take the square root of 4 out front:', template: '{b}√14', blanks: { b: 2 } },
+        { say: 'Write the complete simplified answer:', template: '{c}', blanks: { c: '2√14' } }
       ] },
 
     { id: 'p2-15', type: 'radical-exact', source: 'P2 #15', prompt: '√84',
@@ -1043,7 +1047,8 @@ In `geometry-10/src/problems.js`, insert these entries into the `PROBLEMS` array
       verify: function (a) { return Math.abs(a.coef * Math.sqrt(a.rad) - Math.sqrt(84)) < 1e-9; },
       steps: [
         { say: 'Find the largest perfect square that divides 84:', template: '√84 = √({a} · 21)', blanks: { a: 4 } },
-        { say: 'Take the square root of 4 out front:', template: '{b}√21', blanks: { b: 2 } }
+        { say: 'Take the square root of 4 out front:', template: '{b}√21', blanks: { b: 2 } },
+        { say: 'Write the complete simplified answer:', template: '{c}', blanks: { c: '2√21' } }
       ] },
 
     // ---- Type 8b: exponents. The minus sign is inside the parentheses or
@@ -1470,7 +1475,9 @@ An empty file still proves nothing is implemented. Without it, `load('src/genera
         { say: 'Find the largest perfect square that divides ' + n + ':',
           template: '√' + n + ' = √({a} · ' + rad + ')', blanks: { a: coef * coef } },
         { say: 'Take the square root of ' + (coef * coef) + ' out front:',
-          template: '{b}√' + rad, blanks: { b: coef } }
+          template: '{b}√' + rad, blanks: { b: coef } },
+        { say: 'Write the complete simplified answer:',
+          template: '{c}', blanks: { c: coef + '√' + rad } }
       ]
     };
   }
