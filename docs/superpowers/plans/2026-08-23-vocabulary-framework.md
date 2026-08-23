@@ -1875,7 +1875,7 @@ In `shared/vocab/views.js`, replace the placeholder `renderDone` with the versio
         '<small>of ' + summary.total + ' right on the first try</small></p>';
       if (summary.second.length) {
         html += '<p>' + summary.second.length +
-          (summary.second.length === 1 ? ' took' : ' took') +
+          (summary.second.length === 1 ? ' word took' : ' words took') +
           ' a second try.</p>';
       }
       html += reviewList(summary);
