@@ -426,11 +426,18 @@ globalThis.SUBJECT = {
 // SUBJECT.sideB, so the same file serves a language quiz and a science one.
 (function () {
   var CORRECT_PAUSE_MS = 650;
+  // The second press of a real double-click hit-tests against the DOM that has
+  // already been swapped in, so disabling the clicked node cannot stop it —
+  // by then that node is gone and the point may sit over a fresh option.
+  // Guard the destination instead: ignore option clicks that arrive sooner
+  // than a person could have read a prompt they have not seen before.
+  var SETTLE_MS = 250;
 
   var app = document.getElementById('app');
   var round = null;
   var progress = loadProgress();
   var pending = null;   // timer id for the pause after a correct answer
+  var renderedAt = 0;   // when the current question was painted
 
   function loadProgress() {
     try {
@@ -545,6 +552,7 @@ globalThis.SUBJECT = {
       buttons[b].addEventListener('click', onChoose);
     }
     if (buttons.length) buttons[0].focus();
+    renderedAt = Date.now();
   }
 
   function optionButtons() { return app.querySelectorAll('.option'); }
@@ -566,6 +574,9 @@ globalThis.SUBJECT = {
   function onChoose(ev) {
     var button = ev.currentTarget;
     if (button.disabled) return;
+    // Too soon to be a considered answer: this is the tail of a double-click
+    // that started on the previous screen. Swallow it rather than record it.
+    if (Date.now() - renderedAt < SETTLE_MS) return;
     var q = round.current();                 // snapshot BEFORE answering
     var chosen = q.options[Number(button.getAttribute('data-index'))];
     var result = round.answer(chosen);
@@ -690,9 +701,13 @@ globalThis.SUBJECT = {
       retry.addEventListener('click', function () { startRound(mode, items); });
       retry.focus();
     }
-    document.getElementById('again').addEventListener('click', function () {
+    var again = document.getElementById('again');
+    again.addEventListener('click', function () {
       if (wasRetry) { renderMenu(); } else { startRound(mode, null); }
     });
+    // The retry screen has no #retry to take focus, so this is the only
+    // button on it: without this a keyboard user lands at the top of the page.
+    if (!retry) again.focus();
   }
 
   document.title = SUBJECT.title;
