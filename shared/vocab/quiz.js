@@ -67,6 +67,116 @@
     return '';
   }
 
+  // A round of questions. Two rules live here and nowhere else:
+  //   main  - two tries, then the answer is revealed and the round moves on
+  //   retry - one try; a miss goes to the back of the queue and comes around
+  //           again, so the round ends only when every word has been answered
+  //           correctly once
+  function createRound(subject, mode, options) {
+    var opts = options || {};
+    var rng = opts.rng || makeRng(Math.floor(Math.random() * 1e9) + 1);
+    var isRetry = !!opts.retry;
+    var triesAllowed = isRetry ? 1 : 2;
+
+    var items = opts.items ? opts.items.slice() : null;
+    if (!items) {
+      items = [];
+      for (var i = 0; i < subject.pairs.length; i++) items.push(i);
+    }
+    var queue = shuffle(items, rng);
+    var total = queue.length;
+
+    var current = null, tries = 0, done = false;
+    var answered = 0, cleared = 0, clean = 0;
+    var second = [], missed = [];
+
+    function loadNext() {
+      if (!queue.length) { done = true; current = null; return; }
+      current = buildQuestion(subject, mode, queue.shift(), rng);
+      tries = 0;
+    }
+
+    function result(status, chosen, shown, note) {
+      return {
+        status: status,
+        correct: status === 'correct' || status === 'correct-second',
+        chosen: chosen,
+        answer: shown,
+        note: note,
+        pairIndex: current ? current.pairIndex : -1,
+        complete: false
+      };
+    }
+
+    function answer(choice) {
+      if (done || current === null) {
+        return { status: 'done', correct: false, chosen: choice, answer: '',
+                 note: '', pairIndex: -1, complete: true };
+      }
+      var pairIndex = current.pairIndex;
+
+      if (choice === current.answer) {
+        var status = tries === 0 ? 'correct' : 'correct-second';
+        if (isRetry) {
+          cleared += 1;
+        } else {
+          answered += 1;
+          if (tries === 0) { clean += 1; } else { second.push(pairIndex); }
+        }
+        var ok = result(status, choice, '', '');
+        loadNext();
+        ok.complete = done;
+        return ok;
+      }
+
+      tries += 1;
+      if (tries < triesAllowed) return result('retry', choice, '', '');
+
+      var shown = current.answer;
+      var note = noteFor(subject, pairIndex);
+      var out = result('revealed', choice, shown, note);
+      if (isRetry) {
+        queue.push(pairIndex);   // comes around again on a later pass
+      } else {
+        answered += 1;
+        missed.push(pairIndex);
+      }
+      loadNext();
+      out.complete = done;
+      return out;
+    }
+
+    function summary() {
+      return {
+        total: total,
+        clean: clean,
+        second: second.slice(),
+        missed: missed.slice(),
+        unclean: second.concat(missed)
+      };
+    }
+
+    function progressText() {
+      if (isRetry) {
+        var left = queue.length + (current ? 1 : 0);
+        return left === 1 ? '1 word left' : left + ' words left';
+      }
+      return 'Question ' + Math.min(answered + 1, total) + ' of ' + total;
+    }
+
+    loadNext();
+
+    return {
+      current: function () { return current; },
+      answer: answer,
+      summary: summary,
+      progressText: progressText,
+      isDone: function () { return done; },
+      isRetry: function () { return isRetry; },
+      mode: function () { return mode; }
+    };
+  }
+
   globalThis.OPTION_COUNT = OPTION_COUNT;
   globalThis.MODE_A_TO_B = MODE_A_TO_B;
   globalThis.MODE_B_TO_A = MODE_B_TO_A;
@@ -75,4 +185,5 @@
   globalThis.sideKeys = sideKeys;
   globalThis.buildQuestion = buildQuestion;
   globalThis.noteFor = noteFor;
+  globalThis.createRound = createRound;
 })();
