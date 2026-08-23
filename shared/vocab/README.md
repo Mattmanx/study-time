@@ -36,10 +36,12 @@ All commands below run from the repository root.
    reaches the repository root.
 5. Copy `<subject>/tests/run.sh` from `spanish-10/tests/run.sh`, and write
    `<subject>/tests/words.test.js`, modeled on `spanish-10/tests/words.test.js`
-   — it needs the same three `load()` lines (helpers, `validate.js`, then this
-   subject's `src/words.js`) before anything can run. At minimum, call
-   `validateSubject(SUBJECT)` and assert it returns nothing, plus spot checks
-   against the answer key.
+   — it needs the same four `load()` lines that file opens with (the test
+   helpers, `validate.js`, `quiz.js`, then this subject's `src/words.js`)
+   before anything can run. `quiz.js` is the one that is easy to leave out and
+   only bites later, when a round-completion assertion reaches for
+   `createRound`. At minimum, call `validateSubject(SUBJECT)` and assert it
+   returns nothing, plus spot checks against the answer key.
 6. `./<subject>/tests/run.sh`
 7. `python3 tools/build.py <subject>`
 8. Add a `<li>` to `src/app.html` under the right grade, then
