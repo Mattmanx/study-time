@@ -176,4 +176,75 @@ var over = createRound(FIXTURE, MODE_A_TO_B, { rng: makeRng(2), items: [3] });
 over.answer(over.current().answer);
 check('answering past the end is inert', over.answer('anything').status, 'done');
 
+// ---------- retry rounds ----------
+
+function retryRound(items, seed) {
+  return createRound(FIXTURE, MODE_B_TO_A, { rng: makeRng(seed || 4),
+                                             retry: true, items: items });
+}
+
+// --- one try only: a miss reveals immediately, no second chance
+var rt = retryRound([0, 1, 2]);
+var rq = rt.current();
+var rmiss = rt.answer(wrongOption(rq));
+check('retry miss reveals at once', rmiss.status, 'revealed');
+check('retry miss shows the answer', rmiss.answer, rq.answer);
+check('retry miss moves on', rt.isDone(), false);
+
+// --- a missed word comes back on a later pass
+var seenAgain = false, guard = 0;
+while (!rt.isDone() && guard < 50) {
+  var cur = rt.current();
+  if (cur.pairIndex === rq.pairIndex) seenAgain = true;
+  rt.answer(cur.answer);
+  guard += 1;
+}
+check('a missed word comes back', seenAgain, true);
+check('retry round ends once everything is clean', rt.isDone(), true);
+
+// --- a cleared word never returns, however long the round runs
+var rt2 = retryRound([0, 1, 2, 3], 9);
+var firstPair = rt2.current().pairIndex;
+rt2.answer(rt2.current().answer);   // cleared on the first pass
+var reappeared = 0, guard2 = 0;
+while (!rt2.isDone() && guard2 < 200) {
+  var c2 = rt2.current();
+  if (c2.pairIndex === firstPair) reappeared += 1;
+  // miss everything once, then answer correctly, to force several passes
+  if (guard2 < 4) { rt2.answer(wrongOption(c2)); } else { rt2.answer(c2.answer); }
+  guard2 += 1;
+}
+check('a cleared word never returns', reappeared, 0);
+check('the forced-miss round still ends', rt2.isDone(), true);
+
+// --- termination: missing every word repeatedly still converges
+var rt3 = retryRound([0, 1, 2, 3, 4, 5], 17);
+var turns = 0;
+while (!rt3.isDone() && turns < 500) {
+  var c3 = rt3.current();
+  // miss the first three showings of each word, then get it right
+  if (turns < 18) { rt3.answer(wrongOption(c3)); } else { rt3.answer(c3.answer); }
+  turns += 1;
+}
+check('a long retry round terminates', rt3.isDone(), true);
+check('it took the expected number of turns', turns, 24);
+
+// --- the counter counts words left, not questions asked
+var rt4 = retryRound([0, 1, 2], 6);
+check('counter starts at the list size', rt4.progressText(), '3 words left');
+rt4.answer(wrongOption(rt4.current()));
+check('a miss does not reduce the counter', rt4.progressText(), '3 words left');
+rt4.answer(rt4.current().answer);
+check('a correct answer reduces the counter', rt4.progressText(), '2 words left');
+rt4.answer(rt4.current().answer);
+check('the last word is singular', rt4.progressText(), '1 word left');
+
+// --- a single-word retry round is answerable and terminates
+var solo = retryRound([2], 8);
+solo.answer(wrongOption(solo.current()));
+check('a solo miss keeps the round alive', solo.isDone(), false);
+check('the solo word comes straight back', solo.current().pairIndex, 2);
+solo.answer(solo.current().answer);
+check('the solo round ends', solo.isDone(), true);
+
 done('quiz');

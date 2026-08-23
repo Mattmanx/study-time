@@ -87,7 +87,7 @@
     var total = queue.length;
 
     var current = null, tries = 0, done = false;
-    var answered = 0, cleared = 0, clean = 0;
+    var answered = 0, clean = 0;
     var second = [], missed = [];
 
     function loadNext() {
@@ -117,9 +117,7 @@
 
       if (choice === current.answer) {
         var status = tries === 0 ? 'correct' : 'correct-second';
-        if (isRetry) {
-          cleared += 1;
-        } else {
+        if (!isRetry) {
           answered += 1;
           if (tries === 0) { clean += 1; } else { second.push(pairIndex); }
         }
