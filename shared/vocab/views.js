@@ -1,0 +1,201 @@
+// All DOM. Every other module in the framework is DOM-free and unit tested.
+// Nothing here knows what the subject is: labels come from SUBJECT.sideA and
+// SUBJECT.sideB, so the same file serves a language quiz and a science one.
+(function () {
+  var CORRECT_PAUSE_MS = 650;
+
+  var app = document.getElementById('app');
+  var round = null;
+  var progress = loadProgress();
+  var pending = null;   // timer id for the pause after a correct answer
+
+  function loadProgress() {
+    try {
+      return parseProgress(window.localStorage.getItem(storageKey(SUBJECT)));
+    } catch (e) {
+      return emptyProgress();
+    }
+  }
+
+  function saveProgress() {
+    try {
+      window.localStorage.setItem(storageKey(SUBJECT),
+                                  serializeProgress(progress));
+    } catch (e) { /* private browsing, a full disk: not worth interrupting */ }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function modeLabel(mode) {
+    var keys = sideKeys(mode);
+    var from = keys.prompt === 'a' ? SUBJECT.sideA : SUBJECT.sideB;
+    var to = keys.answer === 'a' ? SUBJECT.sideA : SUBJECT.sideB;
+    return from.name + ' → ' + to.name;
+  }
+
+  function langOf(side) {
+    return (side === 'a' ? SUBJECT.sideA : SUBJECT.sideB).lang || 'en';
+  }
+
+  function clearPending() {
+    if (pending !== null) { window.clearTimeout(pending); pending = null; }
+  }
+
+  // ---------- menu ----------
+
+  function renderMenu() {
+    clearPending();
+    round = null;
+    var modes = [MODE_A_TO_B, MODE_B_TO_A];
+    var html = '<p class="crumb"><a href="../index.html">← All topics</a></p>' +
+      '<h1>' + escapeHtml(SUBJECT.title) + '</h1>' +
+      '<p class="sub">' + escapeHtml(SUBJECT.subtitle || '') + '</p>' +
+      '<h2>Choose a direction</h2><ul class="modes">';
+    for (var i = 0; i < modes.length; i++) {
+      var best = bestScore(progress, modes[i]);
+      html += '<li><button type="button" data-mode="' + modes[i] + '">' +
+        '<span>' + escapeHtml(modeLabel(modes[i])) + '</span>' +
+        '<span class="best">' +
+        (best ? 'Best ' + best + ' of ' + SUBJECT.pairs.length : 'Not tried yet') +
+        '</span></button></li>';
+    }
+    html += '</ul>';
+
+    var spots = troubleSpots(progress).slice(0, 5);
+    if (spots.length) {
+      html += '<h2>Worth reviewing</h2><ul class="trouble">';
+      for (var s = 0; s < spots.length; s++) {
+        html += '<li>' + escapeHtml(spots[s].text) + ' · missed ' +
+                spots[s].misses + (spots[s].misses === 1 ? ' time' : ' times') +
+                '</li>';
+      }
+      html += '</ul>';
+    }
+    app.innerHTML = html;
+
+    var buttons = app.querySelectorAll('.modes button');
+    for (var b = 0; b < buttons.length; b++) {
+      buttons[b].addEventListener('click', function (ev) {
+        startRound(ev.currentTarget.getAttribute('data-mode'), null);
+      });
+    }
+  }
+
+  // ---------- quiz ----------
+
+  function startRound(mode, items) {
+    clearPending();
+    round = createRound(SUBJECT, mode, {
+      items: items,
+      retry: !!items
+    });
+    renderQuestion();
+  }
+
+  function renderQuestion() {
+    var q = round.current();
+    if (!q) { renderDone(); return; }
+    var keys = sideKeys(round.mode());
+    var html = '<p class="crumb"><a href="#" id="to-menu">← Menu</a></p>' +
+      '<p id="progress">' + escapeHtml(round.progressText()) + '</p>' +
+      '<p class="prompt" lang="' + langOf(keys.prompt) + '">' +
+      escapeHtml(q.prompt) + '</p><ul class="options">';
+    for (var i = 0; i < q.options.length; i++) {
+      html += '<li><button type="button" class="option" data-index="' + i +
+        '" lang="' + langOf(keys.answer) + '">' +
+        escapeHtml(q.options[i]) + '</button></li>';
+    }
+    html += '</ul><p id="feedback" aria-live="polite"></p>';
+    app.innerHTML = html;
+
+    document.getElementById('to-menu').addEventListener('click', function (ev) {
+      ev.preventDefault();
+      renderMenu();
+    });
+    var buttons = app.querySelectorAll('.option');
+    for (var b = 0; b < buttons.length; b++) {
+      buttons[b].addEventListener('click', onChoose);
+    }
+    if (buttons.length) buttons[0].focus();
+  }
+
+  function optionButtons() { return app.querySelectorAll('.option'); }
+
+  function disableAll(fade) {
+    var buttons = optionButtons();
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].disabled = true;
+      if (fade && !buttons[i].className.match(/wrong|right/)) {
+        buttons[i].className += ' faded';
+      }
+    }
+  }
+
+  function setFeedback(html) {
+    document.getElementById('feedback').innerHTML = html;
+  }
+
+  function onChoose(ev) {
+    var button = ev.currentTarget;
+    if (button.disabled) return;
+    var q = round.current();                 // snapshot BEFORE answering
+    var chosen = q.options[Number(button.getAttribute('data-index'))];
+    var result = round.answer(chosen);
+
+    if (result.status === 'retry') {
+      // The question stays up. Only the wrong choice is taken away.
+      button.className = 'option wrong';
+      button.disabled = true;
+      setFeedback('<span class="verdict bad">Not that one.</span> ' +
+                  'Try again — one more go.');
+      var remaining = optionButtons();
+      for (var i = 0; i < remaining.length; i++) {
+        if (!remaining[i].disabled) { remaining[i].focus(); break; }
+      }
+      return;
+    }
+
+    if (result.correct) {
+      button.className = 'option right';
+      disableAll(true);
+      setFeedback('<span class="verdict good">' +
+                  (result.status === 'correct' ? 'Correct.' : 'Right — second try.') +
+                  '</span>');
+      pending = window.setTimeout(function () {
+        pending = null;
+        renderQuestion();
+      }, CORRECT_PAUSE_MS);
+      return;
+    }
+
+    // Revealed: out of tries in a main round, or a miss in a retry round.
+    button.className = 'option wrong';
+    var rightIdx = q.options.indexOf(result.answer);
+    var right = rightIdx === -1 ? null : optionButtons()[rightIdx];
+    if (right) right.className = 'option right';
+    disableAll(true);
+    setFeedback('<span class="verdict bad">The answer is ' +
+                escapeHtml(result.answer) + '.</span>' +
+                (result.note ? '<span class="note">' + escapeHtml(result.note) +
+                 '</span>' : '') +
+                '<button type="button" class="primary" id="next">Next</button>');
+    document.getElementById('next').addEventListener('click', renderQuestion);
+    document.getElementById('next').focus();
+  }
+
+  // ---------- done (placeholder, replaced in the next task) ----------
+
+  function renderDone() {
+    var summary = round.summary();
+    app.innerHTML = '<h1>Round complete</h1><p class="score">' +
+      summary.clean + '<small>of ' + summary.total + ' clean</small></p>' +
+      '<button type="button" class="primary" id="to-menu-2">Back to menu</button>';
+    document.getElementById('to-menu-2').addEventListener('click', renderMenu);
+  }
+
+  document.title = SUBJECT.title;
+  renderMenu();
+})();

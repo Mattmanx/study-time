@@ -1,0 +1,2 @@
+# Stylesheets, in order. Paths are relative to this src/ directory.
+../../shared/vocab/vocab.css
