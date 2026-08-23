@@ -122,17 +122,22 @@ The storage key is `study-time.<id>.progress`, derived — never hardcoded.
 
 ### Engine API (`quiz.js`)
 
-Pure functions and a plain-object round state. No DOM, no globals beyond the
-exported names, no `Math.random` — every function that shuffles takes a seeded
-RNG so tests can assert exact output.
+Pure functions and a closure-based round object. No DOM, no globals beyond the
+exported names. `Math.random` appears exactly once, as the default seed at the
+public entry point (`createRound`'s `opts.rng` fallback); every shuffling or
+drawing function below it takes an injected RNG, so every path under test is
+deterministic.
 
 - `makeRng(seed)` — deterministic generator
-- `buildRound(subject, mode, rng)` — a shuffled full round
-- `buildRetryRound(subject, mode, items, rng)` — a retry round from unclean items
-- `currentQuestion(round)` — prompt, four options, remaining tries
-- `answer(round, choice, rng)` — returns the outcome and the next state, and is
-  the single place the two-try and retry-requeue rules live
-- `roundSummary(round)` — score plus the clean / second-try / missed partition
+- `shuffle(list, rng)` — a new shuffled array; the input is left untouched
+- `buildQuestion(subject, mode, pairIndex, rng)` — one question: prompt,
+  answer, and four options
+- `noteFor(subject, pairIndex)` — the confusable note for that pair, or `''`
+- `createRound(subject, mode, options)` — `options` is `{ rng, items, retry }`,
+  all optional. Returns an object with `current()`, `answer(choice)`,
+  `summary()`, `progressText()`, `isDone()`, `isRetry()`, and `mode()`. The
+  two-try rule and the retry requeue both live inside `answer()`, and nowhere
+  else.
 
 ### Storage (`storage.js`)
 

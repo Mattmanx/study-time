@@ -613,8 +613,10 @@ globalThis.SUBJECT = {
     var right = rightIdx === -1 ? null : optionButtons()[rightIdx];
     if (right) right.className = 'option right';
     disableAll(true);
+    var answerSide = sideKeys(round.mode()).answer;
     setFeedback('<span class="verdict bad">The answer is ' +
-                escapeHtml(result.answer) + '.</span>' +
+                '<span lang="' + escapeHtml(langOf(answerSide)) + '">' +
+                escapeHtml(result.answer) + '</span>.</span>' +
                 (result.note ? '<span class="note">' + escapeHtml(result.note) +
                  '</span>' : '') +
                 '<button type="button" class="primary" id="next">Next</button>');
