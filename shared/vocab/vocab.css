@@ -1,4 +1,9 @@
 :root { color-scheme: light dark; --ok: #1a7f37; --no: #b3261e; --warn: #a26a00; }
+/* The light values fall under 4.5:1 on a dark canvas, and these tokens colour
+   the verdict line — exactly what a student reads after a miss. */
+@media (prefers-color-scheme: dark) {
+  :root { --ok: #3fb950; --no: #f85149; --warn: #d29922; }
+}
 body {
   font: 16px/1.6 system-ui, -apple-system, sans-serif;
   max-width: 40rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem;

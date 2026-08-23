@@ -55,7 +55,9 @@
       '<p class="sub">' + escapeHtml(SUBJECT.subtitle || '') + '</p>' +
       '<h2>Choose a direction</h2><ul class="modes">';
     for (var i = 0; i < modes.length; i++) {
-      var best = bestScore(progress, modes[i]);
+      // Coerce once: stored progress is user-editable, and a non-numeric best
+      // would otherwise be written into the markup unescaped.
+      var best = Number(bestScore(progress, modes[i])) || 0;
       html += '<li><button type="button" data-mode="' + modes[i] + '">' +
         '<span>' + escapeHtml(modeLabel(modes[i])) + '</span>' +
         '<span class="best">' +
@@ -68,9 +70,9 @@
     if (spots.length) {
       html += '<h2>Worth reviewing</h2><ul class="trouble">';
       for (var s = 0; s < spots.length; s++) {
-        html += '<li>' + escapeHtml(spots[s].text) + ' · missed ' +
-                spots[s].misses + (spots[s].misses === 1 ? ' time' : ' times') +
-                '</li>';
+        var misses = Number(spots[s].misses) || 0;
+        html += '<li>' + escapeHtml(spots[s].text) + ' · missed ' + misses +
+                (misses === 1 ? ' time' : ' times') + '</li>';
       }
       html += '</ul>';
     }
@@ -101,11 +103,11 @@
     var keys = sideKeys(round.mode());
     var html = '<p class="crumb"><a href="#" id="to-menu">← Menu</a></p>' +
       '<p id="progress">' + escapeHtml(round.progressText()) + '</p>' +
-      '<p class="prompt" lang="' + langOf(keys.prompt) + '">' +
+      '<p class="prompt" lang="' + escapeHtml(langOf(keys.prompt)) + '">' +
       escapeHtml(q.prompt) + '</p><ul class="options">';
     for (var i = 0; i < q.options.length; i++) {
       html += '<li><button type="button" class="option" data-index="' + i +
-        '" lang="' + langOf(keys.answer) + '">' +
+        '" lang="' + escapeHtml(langOf(keys.answer)) + '">' +
         escapeHtml(q.options[i]) + '</button></li>';
     }
     html += '</ul><p id="feedback" aria-live="polite"></p>';
@@ -182,18 +184,92 @@
                 (result.note ? '<span class="note">' + escapeHtml(result.note) +
                  '</span>' : '') +
                 '<button type="button" class="primary" id="next">Next</button>');
-    document.getElementById('next').addEventListener('click', renderQuestion);
+    // Disable before re-rendering: a fast second click would otherwise land on
+    // whatever now occupies that point — often an option of the next question.
+    document.getElementById('next').addEventListener('click', function () {
+      if (this.disabled) return;
+      this.disabled = true;
+      renderQuestion();
+    });
     document.getElementById('next').focus();
   }
 
-  // ---------- done (placeholder, replaced in the next task) ----------
+  // ---------- done ----------
+
+  function pairRow(index, tier) {
+    var pair = SUBJECT.pairs[index];
+    var tag = tier === 'second' ? 'second try' : 'missed';
+    return '<li class="' + tier + '"><span class="tag">' + tag + '</span>' +
+      '<span class="term" lang="' + escapeHtml(langOf('a')) + '">' +
+      escapeHtml(pair.a) + '</span> — ' +
+      '<span class="gloss" lang="' + escapeHtml(langOf('b')) + '">' +
+      escapeHtml(pair.b) + '</span></li>';
+  }
+
+  function reviewList(summary) {
+    if (!summary.unclean.length) return '';
+    var html = '<h2>Review these</h2><ul class="review">';
+    for (var s = 0; s < summary.second.length; s++) {
+      html += pairRow(summary.second[s], 'second');
+    }
+    for (var m = 0; m < summary.missed.length; m++) {
+      html += pairRow(summary.missed[m], 'missed');
+    }
+    return html + '</ul>';
+  }
 
   function renderDone() {
+    clearPending();
     var summary = round.summary();
-    app.innerHTML = '<h1>Round complete</h1><p class="score">' +
-      summary.clean + '<small>of ' + summary.total + ' clean</small></p>' +
-      '<button type="button" class="primary" id="to-menu-2">Back to menu</button>';
-    document.getElementById('to-menu-2').addEventListener('click', renderMenu);
+    var wasRetry = round.isRetry();
+    var mode = round.mode();
+
+    // Only main rounds are scored. A retry round covers a different, smaller
+    // list, so its "score" is not comparable and would corrupt the best.
+    if (!wasRetry) {
+      progress = recordRound(progress, SUBJECT, mode, summary);
+      saveProgress();
+    }
+
+    var html = '<p class="crumb"><a href="#" id="to-menu">← Menu</a></p>';
+    if (wasRetry) {
+      html += '<h1>All caught up</h1>' +
+        '<p>Every word on the list answered correctly — ' +
+        summary.total + (summary.total === 1 ? ' word' : ' words') + '.</p>';
+    } else {
+      html += '<h1>Round complete</h1>' +
+        '<p class="score">' + summary.clean +
+        '<small>of ' + summary.total + ' right on the first try</small></p>';
+      if (summary.second.length) {
+        html += '<p>' + summary.second.length +
+          (summary.second.length === 1 ? ' word took' : ' words took') +
+          ' a second try.</p>';
+      }
+      html += reviewList(summary);
+    }
+
+    html += '<p>';
+    if (!wasRetry && summary.unclean.length) {
+      html += '<button type="button" class="primary" id="retry">' +
+        'Retry the ' + summary.unclean.length + ' you missed</button>';
+    }
+    html += '<button type="button" class="secondary" id="again">' +
+      (wasRetry ? 'Back to menu' : 'Run the whole list again') + '</button></p>';
+    app.innerHTML = html;
+
+    document.getElementById('to-menu').addEventListener('click', function (ev) {
+      ev.preventDefault();
+      renderMenu();
+    });
+    var retry = document.getElementById('retry');
+    if (retry) {
+      var items = summary.unclean.slice();
+      retry.addEventListener('click', function () { startRound(mode, items); });
+      retry.focus();
+    }
+    document.getElementById('again').addEventListener('click', function () {
+      if (wasRetry) { renderMenu(); } else { startRound(mode, null); }
+    });
   }
 
   document.title = SUBJECT.title;
