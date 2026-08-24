@@ -16,6 +16,7 @@ progress.
 | Topic | Grade | Covers |
 | --- | --- | --- |
 | `geometry-10/` | 10th | Test #1 algebra review: coordinate plane, intercepts, multi-step equations, evaluating expressions, fractions, radicals, exponents |
+| `spanish-10/` | 10th | Lección preliminar quiz: greetings and introductions, 29 words and phrases |
 
 ## Geometry — Test #1: Algebra Review
 
@@ -56,6 +57,38 @@ Two more rules worth knowing:
   The same `√250` as a "no calculator" question wants `5√10` and rejects any
   decimal, because the study guide is explicit about it.
 
+## Spanish — Lección preliminar Quiz
+
+Two modes, the same 29 pairs in both directions:
+
+- **Spanish → English** — the prompt is Spanish, the four options are English
+- **English → Spanish** — the other way round
+
+Every round shuffles all 29 and asks each exactly once. The three wrong options
+are drawn at random from the rest of the word bank, near-synonyms included:
+`Regular.` and `Más o menos.` landing in the same question is the point, not a
+bug.
+
+A first miss reddens that option and leaves the question up for a second try. A
+second miss reveals the answer — and when the word belongs to a cluster that is
+genuinely easy to confuse, it names the distinction rather than just saying
+"wrong": *"Both ask how someone is. ¿Cómo estás? is familiar — for a friend.
+¿Cómo está usted? is formal, and usted is the giveaway."*
+
+The end screen scores only the clean answers and lists everything else in two
+tiers: amber for words that took a second try, red for words missed outright.
+**Retry the ones you missed** drills that list one try per showing, sending
+misses to the back of the queue, and ends only when every word has been
+answered correctly.
+
+This tool is built on the reusable engine in `shared/vocab/`. Adding another
+vocabulary subject — another language, or English and science terms — needs a
+word list and three lines of plumbing, not another implementation. The word
+list is a plain JSON data file (`src/words.json`), hand-editable and
+generatable by any script that knows the schema; the build inlines it into the
+page. See
+[`shared/vocab/README.md`](shared/vocab/README.md).
+
 ## How it's built
 
 Source lives in each topic's `src/`. **`index.html` files are generated — edit
@@ -64,6 +97,10 @@ the sources, not them.**
     python3 tools/build.py .              # rebuild the landing page
     python3 tools/build.py geometry-10    # rebuild the geometry tool
     cd geometry-10 && ./tests/run.sh      # run the unit tests
+    python3 tools/build.py spanish-10     # rebuild the Spanish tool
+    ./shared/vocab/tests/run.sh           # run the vocabulary engine tests
+    ./spanish-10/tests/run.sh             # run the Spanish word list checks
+    ./tools/tests/build.test.sh           # run the build script's own test
 
 | File | Responsibility |
 | --- | --- |
@@ -112,3 +149,8 @@ fails the build instead of reaching a student.
 - **A step not yet reached isn't rendered at all, on purpose.** Showing the
   whole chain up front — even blanked out — tells the student where they're
   going before they've thought about the next move.
+- **Vocabulary quizzes share one engine.** `shared/vocab/` holds the whole
+  thing; a subject is a `src/words.json` data file plus three lines of
+  plumbing, and the build inlines the JSON into the page. Read
+  `shared/vocab/README.md` before starting one, and don't put a subject's
+  vocabulary — or its language — into the shared files.

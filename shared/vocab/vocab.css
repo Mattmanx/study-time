@@ -1,0 +1,74 @@
+:root { color-scheme: light dark; --ok: #1a7f37; --no: #b3261e; --warn: #a26a00; }
+/* The light values fall under 4.5:1 on a dark canvas, and these tokens colour
+   the verdict line — exactly what a student reads after a miss. */
+@media (prefers-color-scheme: dark) {
+  :root { --ok: #3fb950; --no: #f85149; --warn: #d29922; }
+}
+body {
+  font: 16px/1.6 system-ui, -apple-system, sans-serif;
+  max-width: 40rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem;
+}
+h1 { font-size: 1.5rem; margin-bottom: .25rem; }
+h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
+     opacity: .6; margin-top: 2rem; }
+.crumb { font-size: .875rem; }
+.crumb a { color: inherit; opacity: .7; }
+.sub { opacity: .7; margin-top: 0; }
+.modes { list-style: none; padding: 0; }
+.modes button {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 1rem; width: 100%; padding: .9rem 1rem; margin-bottom: .6rem;
+  font: inherit; text-align: left; background: none; color: inherit;
+  border: 1px solid currentColor; border-radius: .5rem; cursor: pointer;
+}
+.modes button:hover { background: rgba(128,128,128,.12); }
+.modes .best { font-size: .8rem; opacity: .6; white-space: nowrap; }
+.primary, .secondary {
+  font: inherit; padding: .7rem 1.4rem; margin: .25rem .5rem .25rem 0;
+  border-radius: .5rem; border: 1px solid currentColor; background: none;
+  color: inherit; cursor: pointer;
+}
+.secondary { opacity: .7; }
+#progress { font-size: .8rem; text-transform: uppercase;
+            letter-spacing: .08em; opacity: .6; }
+.prompt { font-size: 1.9rem; line-height: 1.25; margin: .75rem 0 1.5rem; }
+.options { list-style: none; padding: 0; margin: 0; }
+.options button {
+  display: block; width: 100%; padding: .85rem 1rem; margin-bottom: .6rem;
+  font: inherit; font-size: 1.05rem; text-align: left; background: none;
+  color: inherit; border: 1px solid currentColor; border-radius: .5rem;
+  cursor: pointer;
+}
+.options button:hover:not(:disabled) { background: rgba(128,128,128,.12); }
+.options button:disabled { cursor: default; }
+.options button.wrong {
+  border-color: var(--no); color: var(--no); opacity: 1;
+  background: rgba(179,38,30,.08);
+}
+.options button.right {
+  border-color: var(--ok); color: var(--ok); font-weight: 600;
+  background: rgba(26,127,55,.08);
+}
+.options button.faded:disabled { opacity: .4; }
+#feedback { min-height: 3.5rem; margin: 1rem 0 .5rem; }
+#feedback .verdict { font-weight: 600; }
+#feedback .verdict.good { color: var(--ok); }
+#feedback .verdict.bad { color: var(--no); }
+#feedback .note {
+  display: block; margin-top: .4rem; font-size: .95rem; opacity: .85;
+}
+.score { font-size: 2.5rem; margin: .5rem 0 0; }
+.score small { font-size: 1rem; opacity: .6; display: block; }
+.review { list-style: none; padding: 0; }
+.review li {
+  padding: .55rem .75rem; margin-bottom: .4rem; border-radius: .4rem;
+  border-left: 4px solid transparent; background: rgba(128,128,128,.08);
+}
+.review li.second { border-left-color: var(--warn); }
+.review li.missed { border-left-color: var(--no); }
+.review .term { font-weight: 600; }
+.review .gloss { opacity: .75; }
+.review .tag { float: right; font-size: .75rem; text-transform: uppercase;
+               letter-spacing: .06em; opacity: .6; }
+.trouble { list-style: none; padding: 0; font-size: .9rem; }
+.trouble li { padding: .15rem 0; opacity: .8; }
