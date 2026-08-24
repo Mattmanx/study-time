@@ -28,19 +28,37 @@ telling those apart is what a vocabulary quiz tests.
 All commands below run from the repository root.
 
 1. `mkdir -p <subject>/src <subject>/tests`
-2. Write `<subject>/src/words.js` defining `globalThis.SUBJECT` (shape below).
+2. Write `<subject>/src/words.json` — a pure JSON data file, no JavaScript.
+   The schema is below.
 3. Copy `<subject>/src/app.html` from `spanish-10/src/app.html`, changing only
    the `<title>`.
 4. Copy `<subject>/src/manifest.txt` and `<subject>/src/styles.txt` from
    `spanish-10/src/` unchanged. Paths are relative to `src/`, so `../../`
-   reaches the repository root.
+   reaches the repository root. The manifest's data line is what binds the
+   file to the global the engine reads:
+
+   ```
+   SUBJECT = words.json
+   ```
+
+   `tools/build.py` reads that JSON at build time and emits
+   `globalThis.SUBJECT = {…};` at that position in the bundle. The page has to
+   work offline from `file://`, where `fetch()` is blocked, so the data is
+   inlined rather than loaded. Malformed JSON fails the build by name.
 5. Copy `<subject>/tests/run.sh` from `spanish-10/tests/run.sh`, and write
    `<subject>/tests/words.test.js`, modeled on `spanish-10/tests/words.test.js`
-   — it needs the same four `load()` lines that file opens with (the test
-   helpers, `validate.js`, `quiz.js`, then this subject's `src/words.js`)
-   before anything can run. `quiz.js` is the one that is easy to leave out and
-   only bites later, when a round-completion assertion reaches for
-   `createRound`. At minimum, call `validateSubject(SUBJECT)` and assert it
+   — it needs the same four opening lines that file has: three `load()` calls
+   (the test helpers, `validate.js`, `quiz.js`) and then the data, which the
+   test reads for itself because there is no build step under `jsc`:
+
+   ```js
+   globalThis.SUBJECT = JSON.parse(read('src/words.json'));
+   ```
+
+   `read()` is a `jsc` builtin and the path is relative to the subject's root,
+   because `run.sh` `cd`s there first. `quiz.js` is the load that is easy to
+   leave out and only bites later, when a round-completion assertion reaches
+   for `createRound`. At minimum, call `validateSubject(SUBJECT)` and assert it
    returns nothing, plus spot checks against the answer key.
 6. `./<subject>/tests/run.sh`
 7. `python3 tools/build.py <subject>`
@@ -49,33 +67,87 @@ All commands below run from the repository root.
    and is the thing most often forgotten.
 9. Add a row to the root `README.md` table.
 
-## The SUBJECT shape
+## The word list schema
 
-```js
-globalThis.SUBJECT = {
-  id: 'spanish-8',                  // storage key is study-time.<id>.progress
-  title: 'Spanish — Unit 2 Quiz',   // page title and heading
-  subtitle: 'Classroom objects',    // optional line under the heading
-  sideA: { name: 'Spanish', lang: 'es' },
-  sideB: { name: 'English', lang: 'en' },
-  pairs: [
-    { a: 'la mochila', b: 'the backpack' }
+A subject's `words.json` is one JSON object, UTF-8, no comments. Everything the
+engine knows about the subject comes from it.
+
+```json
+{
+  "id": "spanish-8",
+  "title": "Spanish — Unit 2 Quiz",
+  "subtitle": "Classroom objects",
+  "notes": [
+    "Transcribed verbatim from the answer key; do not normalize punctuation."
   ],
-  confusables: [                    // optional
-    { members: ['la mochila', 'la bolsa'],
-      note: 'Why these two get mixed up, in one sentence.' }
+  "sideA": { "name": "Spanish", "lang": "es" },
+  "sideB": { "name": "English", "lang": "en" },
+  "pairs": [
+    { "a": "la mochila", "b": "the backpack" }
+  ],
+  "confusables": [
+    { "members": ["la mochila", "la bolsa"],
+      "note": "Why these two get mixed up, in one sentence." }
   ]
-};
+}
 ```
+
+### Every field
+
+| Field | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `id` | string, non-empty | yes | Storage key is `study-time.<id>.progress`. Use the directory name. |
+| `title` | string, non-empty | yes | Page heading. |
+| `subtitle` | string | no | One line under the heading. Omit it and nothing renders. |
+| `notes` | array of non-empty strings | no | **Ignored at runtime.** JSON has no comments, so this is where the warnings for whoever edits the file live — which oddities in the source are deliberate, and what must not be "corrected". |
+| `sideA` | object | yes | The first direction. |
+| `sideA.name` | string, non-empty | yes | Label on the mode buttons and prompts. |
+| `sideA.lang` | string | no | BCP 47 tag set as the `lang` attribute on rendered side-A text. |
+| `sideB` | object | yes | The other direction; same fields as `sideA`. |
+| `pairs` | array of objects | yes | The word list. **At least 4 entries** — a question shows four options, so fewer makes one impossible. |
+| `pairs[].a` | string | yes | The side-A text. |
+| `pairs[].b` | string | yes | The side-B text. |
+| `confusables` | array of objects | no | Clusters that get a distinction note after a second miss. Omit it entirely if there are none. |
+| `confusables[].members` | array of strings | yes, if the cluster exists | **At least 2**, each an exact match for some `pairs[].a`. |
+| `confusables[].note` | string, non-empty | yes, if the cluster exists | Shown after a second miss on any member. |
+
+### Constraints a generator must satisfy
+
+`shared/vocab/validate.js` enforces these, and each subject's test suite runs
+it, so violating one fails the build rather than reaching a student. A program
+generating a list from an export trips the first three most often.
+
+- Every `pairs[].a` is **unique** across the list, and every `pairs[].b` is
+  **unique** across the list. A duplicate on either side creates a question
+  with two correct options, and the student is marked wrong for being right.
+- Every `pairs[].a` and `pairs[].b` is non-empty and equal to its own
+  `.trim()` — no leading or trailing whitespace. Exported cells usually have
+  some.
+- Every `confusables[].members` entry matches some `pairs[].a` **exactly**,
+  character for character. Near matches are typos, not aliases.
+- `pairs` has at least 4 entries; each cluster has at least 2 members and a
+  non-empty note.
+- Anything not listed in the table above is ignored, but don't rely on that —
+  the validator may grow.
+
+### Notes on the fields that are easy to get wrong
 
 `sideA` and `sideB` name the two directions and set the `lang` attribute on
 rendered text. They are not required to be languages: a science subject can use
-`{ name: 'Term' }` and `{ name: 'Definition' }`, and the mode buttons read
+`{ "name": "Term" }` and `{ "name": "Definition" }`, and the mode buttons read
 **Term → Definition** and **Definition → Term**.
 
-`confusables.members` are **side A strings**. The note is shown after a second
-miss, so write it as the sentence a tutor would say — name the distinction,
-don't restate the answer.
+`confusables.members` are **side A strings**. Distractors are drawn at random
+from the whole pool, near-synonyms included on purpose, so a wrong answer on a
+clustered word is usually a real confusion rather than a blank — `wrong` is not
+useful on its own. The note is shown after a second miss, so write it as the
+sentence a tutor would say: name the distinction, don't restate the answer.
+
+`notes` is prose for the next human to open the file, at the exact place they
+would edit. Use it for the things a reviewer would otherwise "fix": punctuation
+that looks inconsistent because the answer key is inconsistent, parentheticals
+that look redundant but are the only thing separating two items, and any
+correction you made to the source.
 
 ## Rules that are not negotiable
 

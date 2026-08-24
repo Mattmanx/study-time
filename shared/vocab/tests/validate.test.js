@@ -53,6 +53,24 @@ var idless = clone(FIXTURE);
 idless.id = '';
 check('missing id caught', validateSubject(idless).length, 1);
 
+// --- notes are optional documentation, but must be usable prose if present
+var noted = clone(FIXTURE);
+noted.notes = ['Transcribed verbatim; do not normalize the punctuation.'];
+check('notes are allowed', validateSubject(noted).length, 0);
+
+var noNotes = clone(FIXTURE);
+delete noNotes.notes;
+check('notes are optional', validateSubject(noNotes).length, 0);
+
+var badNotes = clone(FIXTURE);
+badNotes.notes = 'a single string is not an array';
+check('non-array notes caught', validateSubject(badNotes).length, 1);
+
+var emptyNote = clone(FIXTURE);
+emptyNote.notes = ['fine', ''];
+check('empty note caught', validateSubject(emptyNote).length, 1);
+check('empty note names its index', errs(emptyNote).indexOf('notes[1]') >= 0, true);
+
 // --- a subject with no confusables at all is fine
 var plain = clone(FIXTURE);
 delete plain.confusables;

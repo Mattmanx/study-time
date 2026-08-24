@@ -27,4 +27,26 @@ printf '<html><style>{{CSS}}</style><script>{{JS}}</script></html>\n' > "$tmp/pl
 python3 tools/build.py "$tmp/plain" > /dev/null
 grep -q 'color: green' "$tmp/plain/index.html" || { echo "FAIL: default app.css missing"; exit 1; }
 
+# A manifest line of the form `NAME = file.json` binds the data to a global.
+mkdir -p "$tmp/data/src"
+printf 'body { color: teal; }\n' > "$tmp/data/src/app.css"
+printf '{"greeting": "\xc2\xbfC\xc3\xb3mo est\xc3\xa1s?", "tag": "a </script> b"}\n' \
+  > "$tmp/data/src/data.json"
+printf '# comment\nSUBJECT = data.json\n' > "$tmp/data/src/manifest.txt"
+printf '<html><style>{{CSS}}</style><script>{{JS}}</script></html>\n' > "$tmp/data/src/app.html"
+python3 tools/build.py "$tmp/data" > /dev/null
+grep -q 'globalThis.SUBJECT =' "$tmp/data/index.html" || { echo "FAIL: json not bound to a global"; exit 1; }
+grep -q '¿Cómo estás?' "$tmp/data/index.html" || { echo "FAIL: non-ASCII value not inlined as itself"; exit 1; }
+grep -q '\\u003c/script>' "$tmp/data/index.html" || { echo "FAIL: < not escaped"; exit 1; }
+if grep -q 'a </script> b' "$tmp/data/index.html"; then
+  echo "FAIL: literal </script> can break out"; exit 1
+fi
+
+# Malformed JSON must fail the build rather than ship unparseable data.
+printf '{"greeting": "unclosed\n' > "$tmp/data/src/data.json"
+if python3 tools/build.py "$tmp/data" > /dev/null 2>"$tmp/err"; then
+  echo "FAIL: malformed JSON did not fail the build"; exit 1
+fi
+grep -q 'data.json' "$tmp/err" || { echo "FAIL: error does not name the file"; exit 1; }
+
 echo "build.test.sh: passed"

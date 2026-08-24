@@ -24,6 +24,21 @@
       }
     }
 
+    // notes is documentation for whoever edits the word list; the engine never
+    // reads it. It is still checked, because a note that is not a string is a
+    // sign the file was generated wrong.
+    if (subject.hasOwnProperty('notes')) {
+      if (!(subject.notes instanceof Array)) {
+        errors.push('subject.notes must be an array of strings');
+      } else {
+        for (var n = 0; n < subject.notes.length; n++) {
+          if (!isNonEmptyString(subject.notes[n])) {
+            errors.push('subject.notes[' + n + '] is not a non-empty string');
+          }
+        }
+      }
+    }
+
     var pairs = subject.pairs;
     if (!(pairs instanceof Array) || pairs.length < MIN_PAIRS) {
       errors.push('subject.pairs needs at least ' + MIN_PAIRS + ' entries');

@@ -83,7 +83,10 @@ answered correctly.
 
 This tool is built on the reusable engine in `shared/vocab/`. Adding another
 vocabulary subject — another language, or English and science terms — needs a
-word list and three lines of plumbing, not another implementation. See
+word list and three lines of plumbing, not another implementation. The word
+list is a plain JSON data file (`src/words.json`), hand-editable and
+generatable by any script that knows the schema; the build inlines it into the
+page. See
 [`shared/vocab/README.md`](shared/vocab/README.md).
 
 ## How it's built
@@ -147,6 +150,7 @@ fails the build instead of reaching a student.
   whole chain up front — even blanked out — tells the student where they're
   going before they've thought about the next move.
 - **Vocabulary quizzes share one engine.** `shared/vocab/` holds the whole
-  thing; a subject is a word list plus three lines of plumbing. Read
+  thing; a subject is a `src/words.json` data file plus three lines of
+  plumbing, and the build inlines the JSON into the page. Read
   `shared/vocab/README.md` before starting one, and don't put a subject's
   vocabulary — or its language — into the shared files.

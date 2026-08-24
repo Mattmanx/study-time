@@ -77,9 +77,9 @@ shared/vocab/
   README.md     the recipe for adding a subject, and the invariants
 
 spanish-10/
-  src/words.js     the only subject-specific content
+  src/words.json   the only subject-specific content — a pure JSON data file
   src/app.html     head, title, <main id="app">, template tokens
-  src/manifest.txt shared JS by relative path, then words.js
+  src/manifest.txt shared JS by relative path, then `SUBJECT = words.json`
   src/styles.txt   shared CSS by relative path
   index.html       generated — never edited
   reference/       gitignored teacher materials
@@ -93,25 +93,42 @@ shared layer is churn.
 
 ### Subject configuration
 
-A subject's `words.js` defines exactly one global:
+A subject's data is a pure JSON file, `src/words.json`. It contains no
+JavaScript, so it is hand-editable and generatable by any script that knows the
+schema; adding a subject is adding data.
 
-```js
-globalThis.SUBJECT = {
-  id: 'spanish-10',
-  title: 'Spanish — Lección preliminar Quiz',
-  subtitle: 'Parts 1 and 2 — greetings and introductions',
-  sideA: { name: 'Spanish', lang: 'es' },
-  sideB: { name: 'English', lang: 'en' },
-  pairs: [
-    { a: '¿Cómo estás?', b: 'How are you? (familiar)' },
-    // ...
+```json
+{
+  "id": "spanish-10",
+  "title": "Spanish — Lección preliminar Quiz",
+  "subtitle": "Parts 1 and 2 — greetings and introductions",
+  "notes": ["Which oddities in the source are deliberate. Ignored at runtime."],
+  "sideA": { "name": "Spanish", "lang": "es" },
+  "sideB": { "name": "English", "lang": "en" },
+  "pairs": [
+    { "a": "¿Cómo estás?", "b": "How are you? (familiar)" }
   ],
-  confusables: [
-    { members: ['Regular.', 'Más o menos.'],
-      note: 'Regular. is "okay"; Más o menos. is "so-so."' }
+  "confusables": [
+    { "members": ["Regular.", "Más o menos."],
+      "note": "Regular. is \"okay\"; Más o menos. is \"so-so.\"" }
   ]
-};
+}
 ```
+
+The engine reads it as `globalThis.SUBJECT`. Two consumers bind it there:
+
+- **The page.** A `manifest.txt` line of the form `SUBJECT = words.json` tells
+  `tools/build.py` to parse that file and emit `globalThis.SUBJECT = {…};` at
+  that position in the bundle. The page must work offline from `file://`, where
+  `fetch()` is blocked, so the data is inlined exactly as the JS and CSS are.
+  Malformed JSON fails the build, naming the file; `<`, U+2028 and U+2029 are
+  escaped so no value can break out of the `<script>` element.
+- **The tests.** `jsc` has no `require`, so a subject's suite does
+  `globalThis.SUBJECT = JSON.parse(read('src/words.json'));`.
+
+`notes` is documentation for whoever edits the file, standing in for the
+comments JSON cannot carry. The engine never reads it; `validate.js` only
+checks it is an array of non-empty strings.
 
 `sideA` and `sideB` drive the mode buttons, the `lang` attributes on rendered
 text, and every label the student sees. No language name appears in shared

@@ -1,7 +1,7 @@
 load('../shared/vocab/tests/helpers.js');
 load('../shared/vocab/validate.js');
 load('../shared/vocab/quiz.js');
-load('src/words.js');
+globalThis.SUBJECT = JSON.parse(read('src/words.json'));
 
 // --- the word list survives the shared validator
 check('word list is valid', validateSubject(SUBJECT).join(' | '), '');
