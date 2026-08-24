@@ -58,7 +58,9 @@ var noted = clone(FIXTURE);
 noted.notes = ['Transcribed verbatim; do not normalize the punctuation.'];
 check('notes are allowed', validateSubject(noted).length, 0);
 
-var noNotes = clone(FIXTURE);
+// Removing notes from a subject that has them, so this exercises the
+// optional path rather than repeating the bare-fixture check above.
+var noNotes = clone(noted);
 delete noNotes.notes;
 check('notes are optional', validateSubject(noNotes).length, 0);
 

@@ -12,6 +12,7 @@ fails the build, naming the file.
 """
 import json
 import os
+import re
 import sys
 
 
@@ -33,6 +34,9 @@ def read(src, name):
         return fh.read()
 
 
+IDENTIFIER = re.compile(r"^[A-Za-z_$][A-Za-z0-9_$]*$")
+
+
 def read_json_binding(src, name, path):
     """Return `globalThis.NAME = <json>;` for a `NAME = path.json` manifest line.
 
@@ -43,9 +47,18 @@ def read_json_binding(src, name, path):
     once escaped, and U+2028/U+2029 are legal in JSON but were illegal in JS
     string literals before ES2019.
     """
+    if not IDENTIFIER.match(name):
+        raise SystemExit(
+            "%s/manifest.txt: %r is not a usable JavaScript name. A manifest "
+            "line reads `NAME = file.json`; NAME becomes a global, so a typo "
+            "here would inline a syntax error into the page and the build "
+            "would still report success." % (src, name))
     full = os.path.join(src, path)
-    with open(full, encoding="utf-8") as fh:
-        text = fh.read()
+    try:
+        with open(full, encoding="utf-8") as fh:
+            text = fh.read()
+    except IOError as exc:
+        raise SystemExit("%s: cannot read the data file: %s" % (full, exc))
     try:
         data = json.loads(text)
     except ValueError as exc:

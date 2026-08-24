@@ -44,7 +44,10 @@ All commands below run from the repository root.
    `tools/build.py` reads that JSON at build time and emits
    `globalThis.SUBJECT = {…};` at that position in the bundle. The page has to
    work offline from `file://`, where `fetch()` is blocked, so the data is
-   inlined rather than loaded. Malformed JSON fails the build by name.
+   inlined rather than loaded. Malformed JSON, a missing data file, and a
+   left-hand name that is not a usable JavaScript identifier each fail the
+   build by name — the name becomes a global, so a typo there would
+   otherwise inline a syntax error into a page that still built cleanly.
 5. Copy `<subject>/tests/run.sh` from `spanish-10/tests/run.sh`, and write
    `<subject>/tests/words.test.js`, modeled on `spanish-10/tests/words.test.js`
    — it needs the same four opening lines that file has: three `load()` calls

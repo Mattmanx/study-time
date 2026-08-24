@@ -49,4 +49,26 @@ if python3 tools/build.py "$tmp/data" > /dev/null 2>"$tmp/err"; then
 fi
 grep -q 'data.json' "$tmp/err" || { echo "FAIL: error does not name the file"; exit 1; }
 
+# A typo in the manifest's NAME would otherwise inline a JS syntax error into
+# the page while the build still reported success.
+mkdir -p "$tmp/badname/src"
+printf '{"x":1}\n' > "$tmp/badname/src/data.json"
+printf 'SUB JECT = data.json\n' > "$tmp/badname/src/manifest.txt"
+printf 'body{}\n' > "$tmp/badname/src/app.css"
+printf '<html><style>{{CSS}}</style><script>{{JS}}</script></html>\n' > "$tmp/badname/src/app.html"
+if python3 tools/build.py "$tmp/badname" > /dev/null 2>&1; then
+  echo "FAIL: a manifest NAME that is not a JS identifier was accepted"; exit 1
+fi
+
+# A named data file that is not there should say so, not raise a traceback.
+mkdir -p "$tmp/missing/src"
+printf 'SUBJECT = nope.json\n' > "$tmp/missing/src/manifest.txt"
+printf 'body{}\n' > "$tmp/missing/src/app.css"
+printf '<html><style>{{CSS}}</style><script>{{JS}}</script></html>\n' > "$tmp/missing/src/app.html"
+if python3 tools/build.py "$tmp/missing" > /dev/null 2>&1; then
+  echo "FAIL: a missing data file was accepted"; exit 1
+fi
+python3 tools/build.py "$tmp/missing" 2>&1 | grep -q 'cannot read the data file' \
+  || { echo "FAIL: missing data file did not explain itself"; exit 1; }
+
 echo "build.test.sh: passed"
