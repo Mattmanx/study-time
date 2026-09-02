@@ -16,6 +16,8 @@ progress.
 | Topic | Grade | Covers |
 | --- | --- | --- |
 | `geometry-10/` | 10th | Test #1 algebra review: coordinate plane, intercepts, multi-step equations, evaluating expressions, fractions, radicals, exponents |
+| `geometry-10-t2/` | 10th | Test #2 sections 1-1 to 1-4, the problem half of study guides Part I **and** Part II: Segment and Angle Addition Postulates, distance, midpoint, naming and classifying angles, congruency statements, angle bisectors |
+| `geometry-10-t2-vocab/` | 10th | Test #2 sections 1-1 to 1-4, the vocabulary half: 15 terms, both directions (Parts I and II share one word bank) |
 | `spanish-10/` | 10th | Lección preliminar quiz: greetings and introductions, 29 words and phrases |
 
 ## Geometry — Test #1: Algebra Review
@@ -57,6 +59,56 @@ Two more rules worth knowing:
   The same `√250` as a "no calculator" question wants `5√10` and rejects any
   decimal, because the study guide is explicit about it.
 
+## Geometry — Test #2: Sections 1-1 to 1-4
+
+The test has two halves and so does the tool. **Test #2: Problems** is the same
+drill-and-practice-test engine as Test #1, with eight new topics; **Test #2:
+Vocabulary** is 15 word-bank terms on the shared vocabulary engine. They are
+separate pages with separate progress, linked to each other from the top of
+each one.
+
+There are **two study guides**, Part I and Part II, covering the same sections
+with different numbers. Both are in the problems tool: 26 authored questions,
+roughly two of each topic, and Part I's come first in a drill. Part II is where
+the third bisector question lives — the one that gives the **whole** angle and
+asks for a half, the opposite of Part I's — so drilling bisectors now cycles
+all three directions instead of training one reflex.
+
+The problem half keeps everything Test #1 established — one step at a time,
+one targeted hint before a reveal, generated variants once the study guide's
+own problems run out — and adds what these sections need:
+
+- **A midpoint is not a length.** `(−1.5, −2)` is a legal answer, in decimals
+  or as `(−3/2, −2)`, and rounding it to `(−2, −2)` is wrong. Handing in the
+  two coordinate *sums* instead of their averages is the study guide's own
+  mistake, and it gets named rather than just marked wrong.
+- **A segment has no direction.** `DE ≅ LK` and `DE ≅ KL` are the same
+  statement and both are accepted. An angle name is the opposite: `∠DEF` and
+  `∠FED` name the same angle, but each blank says which endpoint to start
+  from, so the order is graded.
+- **The angle sign is optional.** `∠DEF`, `<DEF`, `angle DEF` and a bare
+  `DEF` all read the same.
+- **Distances round to thousandths only when they have to.** Part I's distance
+  comes out exactly 15, and `15` and `15.000` are both accepted; Part II's is
+  √72, and that one wants `8.485` — exactly three decimal places.
+
+> **There is no teacher answer key for Test #2.** Test #1 had one; this test
+> has only completed student worksheets. Every answer in `problems.js` was
+> derived from the printed question, and each problem carries a `verify` that
+> recomputes it independently.
+>
+> `reference/` holds **three scans**: Part I, Part I again after corrections,
+> and Part II. The middle one adds no questions, and it confirms the three
+> Part I answers that had to be derived without a key — question 5 asks for the
+> **midpoint** (the first scan re-ran the distance formula), question 3 solves
+> to **x = 5**, and vocabulary blanks 1a and 1f were **swapped**.
+>
+> **Part II boxes two contradictory answers on two of its questions**, and in
+> both cases the tool uses the correct one. Its distance is **8.485** (the
+> other boxed value, 11.66, dropped the minus sign on −8), and its midpoint is
+> **(−5, −1)** (the other, (−3, 3), subtracted the coordinates instead of
+> adding them). Both are recorded in `problems.js`.
+
 ## Spanish — Lección preliminar Quiz
 
 Two modes, the same 29 pairs in both directions:
@@ -97,6 +149,10 @@ the sources, not them.**
     python3 tools/build.py .              # rebuild the landing page
     python3 tools/build.py geometry-10    # rebuild the geometry tool
     cd geometry-10 && ./tests/run.sh      # run the unit tests
+    python3 tools/build.py geometry-10-t2 # rebuild the Test #2 problems tool
+    ./geometry-10-t2/tests/run.sh         # run its unit tests
+    python3 tools/build.py geometry-10-t2-vocab
+    ./geometry-10-t2-vocab/tests/run.sh   # run the Test #2 word list checks
     python3 tools/build.py spanish-10     # rebuild the Spanish tool
     ./shared/vocab/tests/run.sh           # run the vocabulary engine tests
     ./spanish-10/tests/run.sh             # run the Spanish word list checks
@@ -111,6 +167,15 @@ the sources, not them.**
 | `src/session.js` | Drill and practice-test sequencing, attempts, scoring |
 | `src/storage.js` | localStorage mastery and trouble spots |
 | `src/views.js` | All DOM: step blanks, coordinate plane and graph SVG |
+
+`geometry-10-t2/src/` mirrors that table, with `figures.js` in place of the
+coordinate-plane drawing in `views.js` — it draws collinear segments, rays from
+a vertex, and two congruent triangles whose tick marks carry the
+correspondence. The two tools are **copies, not a shared engine**: `checker.js`,
+`session.js` and `storage.js` diverge only a little, and the right seam for a
+`shared/mathdrill/` extraction will be clearer with a third test to look at
+than it is with two. Until then, a fix to one is worth checking against the
+other.
 
 Everything except `views.js` is DOM-free, which is what makes it testable
 without a browser.
@@ -149,6 +214,20 @@ fails the build instead of reaching a student.
 - **A step not yet reached isn't rendered at all, on purpose.** Showing the
   whole chain up front — even blanked out — tells the student where they're
   going before they've thought about the next move.
+- **Test #2 has no answer key, and `reference/` holds three scans covering two
+  study guides.** Part I appears twice (the second time after corrections);
+  Part II is the genuinely new one. See the note above and the header comments in
+  `geometry-10-t2/src/problems.js` and `geometry-10-t2-vocab/src/words.json`.
+  Re-derive before "correcting" anything there.
+- **A bisector question must declare its `ask`** — `whole`, `half`, or
+  `other-half`. The three directions have three different wrong answers, and
+  without it the hint would tell a student to stop doubling on the one question
+  where doubling is right. `problems.test.js` enforces that every bisector
+  declares one.
+- **Every type in `TYPES` needs a generator.** A drill falls through to a
+  generated problem the first time one is missed, and `generate()` throws on a
+  type it does not know — a missing entry is a crash mid-session, not a gap.
+  `generators.test.js` checks this.
 - **Vocabulary quizzes share one engine.** `shared/vocab/` holds the whole
   thing; a subject is a `src/words.json` data file plus three lines of
   plumbing, and the build inlines the JSON into the page. Read

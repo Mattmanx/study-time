@@ -1,0 +1,7 @@
+# JS modules, in load order. Shared engine first, then this subject's data,
+# then the views that read both. Paths are relative to this src/ directory.
+# A `NAME = file.json` line inlines that data file as `globalThis.NAME`.
+../../shared/vocab/quiz.js
+../../shared/vocab/storage.js
+SUBJECT = words.json
+../../shared/vocab/views.js

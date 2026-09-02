@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Geometry — Test #2: Sections 1-1 to 1-4</title>
+<style>{{CSS}}</style>
+</head>
+<body>
+<main id="menu-screen">
+  <p class="crumb"><a href="../index.html">← All topics</a></p>
+  <h1>Test #2: Sections 1-1 to 1-4</h1>
+  <p class="note">Vocabulary is a separate quiz — <a href="../geometry-10-t2-vocab/index.html">15 terms, both directions</a>.</p>
+  <h2>Drill one topic</h2>
+  <ul id="topic-list" class="topics"></ul>
+  <h2>Or take a practice test</h2>
+  <button id="start-mock" class="primary">Start practice test</button>
+  <section id="trouble" hidden>
+    <h2>Worth reviewing</h2>
+    <ul id="trouble-list"></ul>
+  </section>
+</main>
+
+<main id="quiz-screen" hidden>
+  <p class="crumb"><a href="#" id="back-to-menu">← Menu</a></p>
+  <p id="progress"></p>
+  <p id="calc-note" class="note" hidden></p>
+  <div id="figure"></div>
+  <p id="prompt" class="prompt"></p>
+  <ol id="steps"></ol>
+  <div id="controls"><button id="check" class="primary">Check</button></div>
+  <p id="feedback" aria-live="polite"></p>
+</main>
+
+<main id="done-screen" hidden>
+  <h1 id="done-title"></h1>
+  <p id="done-score"></p>
+  <section>
+    <h2>Review these</h2>
+    <ul id="review-list"></ul>
+  </section>
+  <button id="again" class="primary">Back to menu</button>
+</main>
+<script>{{JS}}</script>
+</body>
+</html>
