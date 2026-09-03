@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Geometry — Test #2: Vocabulary</title>
+<style>:root { color-scheme: light dark; --ok: #1a7f37; --no: #b3261e; --warn: #a26a00; }
+/* The light values fall under 4.5:1 on a dark canvas, and these tokens colour
+   the verdict line — exactly what a student reads after a miss. */
+@media (prefers-color-scheme: dark) {
+  :root { --ok: #3fb950; --no: #f85149; --warn: #d29922; }
+}
+body {
+  font: 16px/1.6 system-ui, -apple-system, sans-serif;
+  max-width: 40rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem;
+}
+h1 { font-size: 1.5rem; margin-bottom: .25rem; }
+h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
+     opacity: .6; margin-top: 2rem; }
+.crumb { font-size: .875rem; }
+.crumb a { color: inherit; opacity: .7; }
+.sub { opacity: .7; margin-top: 0; }
+.modes { list-style: none; padding: 0; }
+.modes button {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 1rem; width: 100%; padding: .9rem 1rem; margin-bottom: .6rem;
+  font: inherit; text-align: left; background: none; color: inherit;
+  border: 1px solid currentColor; border-radius: .5rem; cursor: pointer;
+}
+.modes button:hover { background: rgba(128,128,128,.12); }
+.modes .best { font-size: .8rem; opacity: .6; white-space: nowrap; }
+.primary, .secondary {
+  font: inherit; padding: .7rem 1.4rem; margin: .25rem .5rem .25rem 0;
+  border-radius: .5rem; border: 1px solid currentColor; background: none;
+  color: inherit; cursor: pointer;
+}
+.secondary { opacity: .7; }
+#progress { font-size: .8rem; text-transform: uppercase;
+            letter-spacing: .08em; opacity: .6; }
+.prompt { font-size: 1.9rem; line-height: 1.25; margin: .75rem 0 1.5rem; }
+.options { list-style: none; padding: 0; margin: 0; }
+.options button {
+  display: block; width: 100%; padding: .85rem 1rem; margin-bottom: .6rem;
+  font: inherit; font-size: 1.05rem; text-align: left; background: none;
+  color: inherit; border: 1px solid currentColor; border-radius: .5rem;
+  cursor: pointer;
+}
+.options button:hover:not(:disabled) { background: rgba(128,128,128,.12); }
+.options button:disabled { cursor: default; }
+.options button.wrong {
+  border-color: var(--no); color: var(--no); opacity: 1;
+  background: rgba(179,38,30,.08);
+}
+.options button.right {
+  border-color: var(--ok); color: var(--ok); font-weight: 600;
+  background: rgba(26,127,55,.08);
+}
+.options button.faded:disabled { opacity: .4; }
+#feedback { min-height: 3.5rem; margin: 1rem 0 .5rem; }
+#feedback .verdict { font-weight: 600; }
+#feedback .verdict.good { color: var(--ok); }
+#feedback .verdict.bad { color: var(--no); }
+#feedback .note {
+  display: block; margin-top: .4rem; font-size: .95rem; opacity: .85;
+}
+.score { font-size: 2.5rem; margin: .5rem 0 0; }
+.score small { font-size: 1rem; opacity: .6; display: block; }
+.review { list-style: none; padding: 0; }
+.review li {
+  padding: .55rem .75rem; margin-bottom: .4rem; border-radius: .4rem;
+  border-left: 4px solid transparent; background: rgba(128,128,128,.08);
+}
+.review li.second { border-left-color: var(--warn); }
+.review li.missed { border-left-color: var(--no); }
+.review .term { font-weight: 600; }
+.review .gloss { opacity: .75; }
+.review .tag { float: right; font-size: .75rem; text-transform: uppercase;
+               letter-spacing: .06em; opacity: .6; }
+.trouble { list-style: none; padding: 0; font-size: .9rem; }
+.trouble li { padding: .15rem 0; opacity: .8; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<p class="crumb"><a href="../geometry-10-t2/index.html">Test #2 problems →</a></p>
+<script>// The quiz engine. Subject-agnostic: it knows only side A and side B of a
+// pair, and every label the student reads comes from the subject's config.
+// No DOM. Every draw takes an injected rng so rounds are reproducible in tests.
+(function () {
+  var OPTION_COUNT = 4;
+  var MODE_A_TO_B = 'a-to-b';
+  var MODE_B_TO_A = 'b-to-a';
+
+  // A small linear congruential generator. Deterministic per seed, which is
+  // the whole point: a failing round can be replayed exactly.
+  function makeRng(seed) {
+    var state = (seed >>> 0) || 1;
+    return function () {
+      state = (state * 1664525 + 1013904223) >>> 0;
+      return state / 4294967296;
+    };
+  }
+
+  function shuffle(list, rng) {
+    var out = list.slice();
+    for (var i = out.length - 1; i > 0; i--) {
+      var j = Math.floor(rng() * (i + 1));
+      var tmp = out[i];
+      out[i] = out[j];
+      out[j] = tmp;
+    }
+    return out;
+  }
+
+  function sideKeys(mode) {
+    return mode === MODE_B_TO_A
+      ? { prompt: 'b', answer: 'a' }
+      : { prompt: 'a', answer: 'b' };
+  }
+
+  // Distractors are drawn from the entire pool, deliberately including near
+  // synonyms: telling those apart is what the quiz is actually testing.
+  function buildQuestion(subject, mode, pairIndex, rng) {
+    var keys = sideKeys(mode);
+    var pairs = subject.pairs;
+    var answer = pairs[pairIndex][keys.answer];
+    var pool = [];
+    for (var i = 0; i < pairs.length; i++) {
+      if (i !== pairIndex) pool.push(pairs[i][keys.answer]);
+    }
+    var options = shuffle(pool, rng).slice(0, OPTION_COUNT - 1);
+    options.push(answer);
+    return {
+      pairIndex: pairIndex,
+      prompt: pairs[pairIndex][keys.prompt],
+      answer: answer,
+      options: shuffle(options, rng)
+    };
+  }
+
+  // Clusters are declared with side A strings, so the lookup is by pair, not
+  // by whatever text happens to be on screen in the current mode.
+  function noteFor(subject, pairIndex) {
+    var clusters = subject.confusables || [];
+    var key = subject.pairs[pairIndex].a;
+    for (var c = 0; c < clusters.length; c++) {
+      var members = clusters[c].members || [];
+      for (var m = 0; m < members.length; m++) {
+        if (members[m] === key) return clusters[c].note;
+      }
+    }
+    return '';
+  }
+
+  // A round of questions. Two rules live here and nowhere else:
+  //   main  - two tries, then the answer is revealed and the round moves on
+  //   retry - one try; a miss goes to the back of the queue and comes around
+  //           again, so the round ends only when every word has been answered
+  //           correctly once
+  function createRound(subject, mode, options) {
+    var opts = options || {};
+    var rng = opts.rng || makeRng(Math.floor(Math.random() * 1e9) + 1);
+    var isRetry = !!opts.retry;
+    var triesAllowed = isRetry ? 1 : 2;
+
+    var items = opts.items ? opts.items.slice() : null;
+    if (!items) {
+      items = [];
+      for (var i = 0; i < subject.pairs.length; i++) items.push(i);
+    }
+    var queue = shuffle(items, rng);
+    var total = queue.length;
+
+    var current = null, tries = 0, done = false;
+    var answered = 0, clean = 0;
+    var second = [], missed = [];
+
+    function loadNext() {
+      if (!queue.length) { done = true; current = null; return; }
+      current = buildQuestion(subject, mode, queue.shift(), rng);
+      tries = 0;
+    }
+
+    function result(status, chosen, shown, note) {
+      return {
+        status: status,
+        correct: status === 'correct' || status === 'correct-second',
+        chosen: chosen,
+        answer: shown,
+        note: note,
+        pairIndex: current ? current.pairIndex : -1,
+        complete: false
+      };
+    }
+
+    function answer(choice) {
+      if (done || current === null) {
+        return { status: 'done', correct: false, chosen: choice, answer: '',
+                 note: '', pairIndex: -1, complete: true };
+      }
+      var pairIndex = current.pairIndex;
+
+      if (choice === current.answer) {
+        var status = tries === 0 ? 'correct' : 'correct-second';
+        if (!isRetry) {
+          answered += 1;
+          if (tries === 0) { clean += 1; } else { second.push(pairIndex); }
+        }
+        var ok = result(status, choice, '', '');
+        loadNext();
+        ok.complete = done;
+        return ok;
+      }
+
+      tries += 1;
+      if (tries < triesAllowed) return result('retry', choice, '', '');
+
+      var shown = current.answer;
+      var note = noteFor(subject, pairIndex);
+      var out = result('revealed', choice, shown, note);
+      if (isRetry) {
+        queue.push(pairIndex);   // comes around again on a later pass
+      } else {
+        answered += 1;
+        missed.push(pairIndex);
+      }
+      loadNext();
+      out.complete = done;
+      return out;
+    }
+
+    function summary() {
+      return {
+        total: total,
+        clean: clean,
+        second: second.slice(),
+        missed: missed.slice(),
+        unclean: second.concat(missed)
+      };
+    }
+
+    function progressText() {
+      if (isRetry) {
+        var left = queue.length + (current ? 1 : 0);
+        return left === 1 ? '1 word left' : left + ' words left';
+      }
+      return 'Question ' + Math.min(answered + 1, total) + ' of ' + total;
+    }
+
+    loadNext();
+
+    return {
+      current: function () { return current; },
+      answer: answer,
+      summary: summary,
+      progressText: progressText,
+      isDone: function () { return done; },
+      isRetry: function () { return isRetry; },
+      mode: function () { return mode; }
+    };
+  }
+
+  globalThis.OPTION_COUNT = OPTION_COUNT;
+  globalThis.MODE_A_TO_B = MODE_A_TO_B;
+  globalThis.MODE_B_TO_A = MODE_B_TO_A;
+  globalThis.makeRng = makeRng;
+  globalThis.shuffle = shuffle;
+  globalThis.sideKeys = sideKeys;
+  globalThis.buildQuestion = buildQuestion;
+  globalThis.noteFor = noteFor;
+  globalThis.createRound = createRound;
+})();
+
+// Best score per mode and a per-word miss tally, kept in localStorage by the
+// caller. Pure: takes and returns plain objects, never touches the browser.
+(function () {
+  var VERSION = 1;
+
+  function storageKey(subject) {
+    return 'study-time.' + subject.id + '.progress';
+  }
+
+  function emptyProgress() {
+    return { version: VERSION, best: {}, misses: {} };
+  }
+
+  function isPlainObject(v) {
+    return v !== null && typeof v === 'object' && !(v instanceof Array);
+  }
+
+  // Anything unexpected yields a fresh record. A study tool losing history is
+  // a nuisance; a study tool refusing to start is a broken evening.
+  function parseProgress(json) {
+    if (!json) return emptyProgress();
+    var data;
+    try { data = JSON.parse(json); } catch (e) { return emptyProgress(); }
+    if (!isPlainObject(data)) return emptyProgress();
+    if (data.version !== VERSION) return emptyProgress();
+    return {
+      version: VERSION,
+      best: isPlainObject(data.best) ? data.best : {},
+      misses: isPlainObject(data.misses) ? data.misses : {}
+    };
+  }
+
+  function copy(obj) {
+    var out = {};
+    for (var k in obj) { if (obj.hasOwnProperty(k)) out[k] = obj[k]; }
+    return out;
+  }
+
+  // Words are tallied by their side A string. An index would shift the first
+  // time the word list is edited, and a tally pointing at the wrong word is
+  // worse than no tally at all.
+  function recordRound(progress, subject, mode, summary) {
+    var best = copy(progress.best);
+    var misses = copy(progress.misses);
+    if (!best.hasOwnProperty(mode) || summary.clean > best[mode]) {
+      best[mode] = summary.clean;
+    }
+    for (var i = 0; i < summary.unclean.length; i++) {
+      var text = subject.pairs[summary.unclean[i]].a;
+      misses[text] = (misses[text] || 0) + 1;
+    }
+    return { version: VERSION, best: best, misses: misses };
+  }
+
+  function bestScore(progress, mode) { return progress.best[mode] || 0; }
+
+  function troubleSpots(progress) {
+    var out = [];
+    for (var text in progress.misses) {
+      if (progress.misses.hasOwnProperty(text) && progress.misses[text] > 0) {
+        out.push({ text: text, misses: progress.misses[text] });
+      }
+    }
+    out.sort(function (a, b) {
+      return b.misses - a.misses || (a.text < b.text ? -1 : 1);
+    });
+    return out;
+  }
+
+  function serializeProgress(progress) { return JSON.stringify(progress); }
+
+  globalThis.storageKey = storageKey;
+  globalThis.emptyProgress = emptyProgress;
+  globalThis.parseProgress = parseProgress;
+  globalThis.recordRound = recordRound;
+  globalThis.bestScore = bestScore;
+  globalThis.troubleSpots = troubleSpots;
+  globalThis.serializeProgress = serializeProgress;
+})();
+
+globalThis.SUBJECT = {
+  "id": "geometry-10-t2-vocab",
+  "title": "Geometry — Test #2: Vocabulary",
+  "subtitle": "Sections 1-1 to 1-4 · 15 terms",
+  "notes": [
+    "Source is Study Guide #2 Part I, sections 1-1 to 1-4, two word banks (7 terms + 8 terms).",
+    "reference/ holds THREE scans. Two are the same Part I worksheet (the second is Part I after corrections). The third is the real Part II. Part II uses the SAME two word banks and the SAME 15 terms as Part I — only the order of the blanks changes — so this file covers both parts and needs no additions. Part II states 1f as \"equal shape and size\" where Part I says \"same shape and size\"; the term is Congruent either way.",
+    "IMPORTANT: there is NO teacher answer key for this test — only the student's completed worksheet. These definitions were derived independently from the printed prompts, using the fact that each word bank is a bijection (7 words for 7 blanks, 8 for 8), so each term is used exactly once.",
+    "Blanks 1a and 1f were SWAPPED on the first scan: \"Collinear\" was written for \"a finite portion of a line\" (that is Segment) and \"segment\" for \"two or more points on the same line\" (that is Collinear). The second scan in reference/ (\"Part 2\") is the same worksheet after corrections, and it corrects exactly these two blanks to Segment and Collinear — confirming what this file already said. Do not \"fix\" it back to the first scan.",
+    "Terms are capitalized as the printed word bank capitalizes them.",
+    "confusables notes are shown after a second miss.",
+    "Part II independently confirms the Part I corrections: its blank 1c, \"a finite portion of a line\", is answered Segment, and its 1b, \"two or more points on the same line\", is answered Collinear — both correct on that worksheet."
+  ],
+  "sideA": {
+    "name": "Term"
+  },
+  "sideB": {
+    "name": "Definition"
+  },
+  "pairs": [
+    {
+      "a": "Point",
+      "b": "A specific location in space"
+    },
+    {
+      "a": "Line",
+      "b": "Made up of points and extends infinitely in two directions"
+    },
+    {
+      "a": "Collinear",
+      "b": "Two or more points on the same line"
+    },
+    {
+      "a": "Noncollinear",
+      "b": "Three or more points that are not all on the same line"
+    },
+    {
+      "a": "Segment",
+      "b": "A finite portion of a line"
+    },
+    {
+      "a": "Congruent",
+      "b": "Having the same shape and size"
+    },
+    {
+      "a": "Midpoint",
+      "b": "The center point of a line segment"
+    },
+    {
+      "a": "Ray",
+      "b": "Has one endpoint and extends infinitely in one direction"
+    },
+    {
+      "a": "Angle",
+      "b": "Formed when two segments or rays share an endpoint"
+    },
+    {
+      "a": "Angle Bisector",
+      "b": "A segment or ray that splits an angle in half"
+    },
+    {
+      "a": "Vertex",
+      "b": "The shared point where two rays or line segments meet, forming an angle"
+    },
+    {
+      "a": "Right Angle",
+      "b": "An angle with an exact measure of 90°"
+    },
+    {
+      "a": "Acute Angle",
+      "b": "An angle that measures less than 90°, but more than 0°"
+    },
+    {
+      "a": "Obtuse Angle",
+      "b": "An angle that measures more than 90°, but less than 180°"
+    },
+    {
+      "a": "Straight Angle",
+      "b": "An angle that measures exactly 180°"
+    }
+  ],
+  "confusables": [
+    {
+      "members": [
+        "Collinear",
+        "Noncollinear"
+      ],
+      "note": "The prefix \"non-\" is the whole difference; collinear points share one line, noncollinear ones do not."
+    },
+    {
+      "members": [
+        "Line",
+        "Segment",
+        "Ray"
+      ],
+      "note": "Distinguish by how many endpoints each has: a line none, a ray one, a segment two."
+    },
+    {
+      "members": [
+        "Acute Angle",
+        "Right Angle",
+        "Obtuse Angle",
+        "Straight Angle"
+      ],
+      "note": "Order them by measure: under 90, exactly 90, between 90 and 180, exactly 180."
+    },
+    {
+      "members": [
+        "Point",
+        "Vertex",
+        "Midpoint"
+      ],
+      "note": "All are points; what differs is where. A vertex is where two rays meet; a midpoint is the center of a segment; a point is any location at all."
+    },
+    {
+      "members": [
+        "Angle",
+        "Angle Bisector"
+      ],
+      "note": "One is the figure, the other is the ray that cuts that figure in half."
+    }
+  ]
+};
+
+// All DOM. Every other module in the framework is DOM-free and unit tested.
+// Nothing here knows what the subject is: labels come from SUBJECT.sideA and
+// SUBJECT.sideB, so the same file serves a language quiz and a science one.
+(function () {
+  var CORRECT_PAUSE_MS = 650;
+  // The second press of a real double-click hit-tests against the DOM that has
+  // already been swapped in, so disabling the clicked node cannot stop it —
+  // by then that node is gone and the point may sit over a fresh option.
+  // Guard the destination instead: ignore option clicks that arrive sooner
+  // than a person could have read a prompt they have not seen before.
+  var SETTLE_MS = 250;
+
+  var app = document.getElementById('app');
+  var round = null;
+  var progress = loadProgress();
+  var pending = null;   // timer id for the pause after a correct answer
+  var renderedAt = 0;   // when the current question was painted
+
+  function loadProgress() {
+    try {
+      return parseProgress(window.localStorage.getItem(storageKey(SUBJECT)));
+    } catch (e) {
+      return emptyProgress();
+    }
+  }
+
+  function saveProgress() {
+    try {
+      window.localStorage.setItem(storageKey(SUBJECT),
+                                  serializeProgress(progress));
+    } catch (e) { /* private browsing, a full disk: not worth interrupting */ }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function modeLabel(mode) {
+    var keys = sideKeys(mode);
+    var from = keys.prompt === 'a' ? SUBJECT.sideA : SUBJECT.sideB;
+    var to = keys.answer === 'a' ? SUBJECT.sideA : SUBJECT.sideB;
+    return from.name + ' → ' + to.name;
+  }
+
+  function langOf(side) {
+    return (side === 'a' ? SUBJECT.sideA : SUBJECT.sideB).lang || 'en';
+  }
+
+  function clearPending() {
+    if (pending !== null) { window.clearTimeout(pending); pending = null; }
+  }
+
+  // ---------- menu ----------
+
+  function renderMenu() {
+    clearPending();
+    round = null;
+    var modes = [MODE_A_TO_B, MODE_B_TO_A];
+    var html = '<p class="crumb"><a href="../index.html">← All topics</a></p>' +
+      '<h1>' + escapeHtml(SUBJECT.title) + '</h1>' +
+      '<p class="sub">' + escapeHtml(SUBJECT.subtitle || '') + '</p>' +
+      '<h2>Choose a direction</h2><ul class="modes">';
+    for (var i = 0; i < modes.length; i++) {
+      // Coerce once: stored progress is user-editable, and a non-numeric best
+      // would otherwise be written into the markup unescaped.
+      var best = Number(bestScore(progress, modes[i])) || 0;
+      html += '<li><button type="button" data-mode="' + modes[i] + '">' +
+        '<span>' + escapeHtml(modeLabel(modes[i])) + '</span>' +
+        '<span class="best">' +
+        (best ? 'Best ' + best + ' of ' + SUBJECT.pairs.length : 'Not tried yet') +
+        '</span></button></li>';
+    }
+    html += '</ul>';
+
+    var spots = troubleSpots(progress).slice(0, 5);
+    if (spots.length) {
+      html += '<h2>Worth reviewing</h2><ul class="trouble">';
+      for (var s = 0; s < spots.length; s++) {
+        var misses = Number(spots[s].misses) || 0;
+        html += '<li>' + escapeHtml(spots[s].text) + ' · missed ' + misses +
+                (misses === 1 ? ' time' : ' times') + '</li>';
+      }
+      html += '</ul>';
+    }
+    app.innerHTML = html;
+
+    var buttons = app.querySelectorAll('.modes button');
+    for (var b = 0; b < buttons.length; b++) {
+      buttons[b].addEventListener('click', function (ev) {
+        startRound(ev.currentTarget.getAttribute('data-mode'), null);
+      });
+    }
+  }
+
+  // ---------- quiz ----------
+
+  function startRound(mode, items) {
+    clearPending();
+    round = createRound(SUBJECT, mode, {
+      items: items,
+      retry: !!items
+    });
+    renderQuestion();
+  }
+
+  function renderQuestion() {
+    var q = round.current();
+    if (!q) { renderDone(); return; }
+    var keys = sideKeys(round.mode());
+    var html = '<p class="crumb"><a href="#" id="to-menu">← Menu</a></p>' +
+      '<p id="progress">' + escapeHtml(round.progressText()) + '</p>' +
+      '<p class="prompt" lang="' + escapeHtml(langOf(keys.prompt)) + '">' +
+      escapeHtml(q.prompt) + '</p><ul class="options">';
+    for (var i = 0; i < q.options.length; i++) {
+      html += '<li><button type="button" class="option" data-index="' + i +
+        '" lang="' + escapeHtml(langOf(keys.answer)) + '">' +
+        escapeHtml(q.options[i]) + '</button></li>';
+    }
+    html += '</ul><p id="feedback" aria-live="polite"></p>';
+    app.innerHTML = html;
+
+    document.getElementById('to-menu').addEventListener('click', function (ev) {
+      ev.preventDefault();
+      renderMenu();
+    });
+    var buttons = app.querySelectorAll('.option');
+    for (var b = 0; b < buttons.length; b++) {
+      buttons[b].addEventListener('click', onChoose);
+    }
+    if (buttons.length) buttons[0].focus();
+    renderedAt = Date.now();
+  }
+
+  function optionButtons() { return app.querySelectorAll('.option'); }
+
+  function disableAll(fade) {
+    var buttons = optionButtons();
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].disabled = true;
+      if (fade && !buttons[i].className.match(/wrong|right/)) {
+        buttons[i].className += ' faded';
+      }
+    }
+  }
+
+  function setFeedback(html) {
+    document.getElementById('feedback').innerHTML = html;
+  }
+
+  function onChoose(ev) {
+    var button = ev.currentTarget;
+    if (button.disabled) return;
+    // Too soon to be a considered answer: this is the tail of a double-click
+    // that started on the previous screen. Swallow it rather than record it.
+    if (Date.now() - renderedAt < SETTLE_MS) return;
+    var q = round.current();                 // snapshot BEFORE answering
+    var chosen = q.options[Number(button.getAttribute('data-index'))];
+    var result = round.answer(chosen);
+
+    if (result.status === 'retry') {
+      // The question stays up. Only the wrong choice is taken away.
+      button.className = 'option wrong';
+      button.disabled = true;
+      setFeedback('<span class="verdict bad">Not that one.</span> ' +
+                  'Try again — one more go.');
+      var remaining = optionButtons();
+      for (var i = 0; i < remaining.length; i++) {
+        if (!remaining[i].disabled) { remaining[i].focus(); break; }
+      }
+      return;
+    }
+
+    if (result.correct) {
+      button.className = 'option right';
+      disableAll(true);
+      setFeedback('<span class="verdict good">' +
+                  (result.status === 'correct' ? 'Correct.' : 'Right — second try.') +
+                  '</span>');
+      pending = window.setTimeout(function () {
+        pending = null;
+        renderQuestion();
+      }, CORRECT_PAUSE_MS);
+      return;
+    }
+
+    // Revealed: out of tries in a main round, or a miss in a retry round.
+    button.className = 'option wrong';
+    var rightIdx = q.options.indexOf(result.answer);
+    var right = rightIdx === -1 ? null : optionButtons()[rightIdx];
+    if (right) right.className = 'option right';
+    disableAll(true);
+    var answerSide = sideKeys(round.mode()).answer;
+    setFeedback('<span class="verdict bad">The answer is ' +
+                '<span lang="' + escapeHtml(langOf(answerSide)) + '">' +
+                escapeHtml(result.answer) + '</span>.</span>' +
+                (result.note ? '<span class="note">' + escapeHtml(result.note) +
+                 '</span>' : '') +
+                '<button type="button" class="primary" id="next">Next</button>');
+    // Disable before re-rendering: a fast second click would otherwise land on
+    // whatever now occupies that point — often an option of the next question.
+    document.getElementById('next').addEventListener('click', function () {
+      if (this.disabled) return;
+      this.disabled = true;
+      renderQuestion();
+    });
+    document.getElementById('next').focus();
+  }
+
+  // ---------- done ----------
+
+  function pairRow(index, tier) {
+    var pair = SUBJECT.pairs[index];
+    var tag = tier === 'second' ? 'second try' : 'missed';
+    return '<li class="' + tier + '"><span class="tag">' + tag + '</span>' +
+      '<span class="term" lang="' + escapeHtml(langOf('a')) + '">' +
+      escapeHtml(pair.a) + '</span> — ' +
+      '<span class="gloss" lang="' + escapeHtml(langOf('b')) + '">' +
+      escapeHtml(pair.b) + '</span></li>';
+  }
+
+  function reviewList(summary) {
+    if (!summary.unclean.length) return '';
+    var html = '<h2>Review these</h2><ul class="review">';
+    for (var s = 0; s < summary.second.length; s++) {
+      html += pairRow(summary.second[s], 'second');
+    }
+    for (var m = 0; m < summary.missed.length; m++) {
+      html += pairRow(summary.missed[m], 'missed');
+    }
+    return html + '</ul>';
+  }
+
+  function renderDone() {
+    clearPending();
+    var summary = round.summary();
+    var wasRetry = round.isRetry();
+    var mode = round.mode();
+
+    // Only main rounds are scored. A retry round covers a different, smaller
+    // list, so its "score" is not comparable and would corrupt the best.
+    if (!wasRetry) {
+      progress = recordRound(progress, SUBJECT, mode, summary);
+      saveProgress();
+    }
+
+    var html = '<p class="crumb"><a href="#" id="to-menu">← Menu</a></p>';
+    if (wasRetry) {
+      html += '<h1>All caught up</h1>' +
+        '<p>Every word on the list answered correctly — ' +
+        summary.total + (summary.total === 1 ? ' word' : ' words') + '.</p>';
+    } else {
+      html += '<h1>Round complete</h1>' +
+        '<p class="score">' + summary.clean +
+        '<small>of ' + summary.total + ' right on the first try</small></p>';
+      if (summary.second.length) {
+        html += '<p>' + summary.second.length +
+          (summary.second.length === 1 ? ' word took' : ' words took') +
+          ' a second try.</p>';
+      }
+      html += reviewList(summary);
+    }
+
+    html += '<p>';
+    if (!wasRetry && summary.unclean.length) {
+      html += '<button type="button" class="primary" id="retry">' +
+        'Retry the ' + summary.unclean.length + ' you missed</button>';
+    }
+    html += '<button type="button" class="secondary" id="again">' +
+      (wasRetry ? 'Back to menu' : 'Run the whole list again') + '</button></p>';
+    app.innerHTML = html;
+
+    document.getElementById('to-menu').addEventListener('click', function (ev) {
+      ev.preventDefault();
+      renderMenu();
+    });
+    var retry = document.getElementById('retry');
+    if (retry) {
+      var items = summary.unclean.slice();
+      retry.addEventListener('click', function () { startRound(mode, items); });
+      retry.focus();
+    }
+    var again = document.getElementById('again');
+    again.addEventListener('click', function () {
+      if (wasRetry) { renderMenu(); } else { startRound(mode, null); }
+    });
+    // The retry screen has no #retry to take focus, so this is the only
+    // button on it: without this a keyboard user lands at the top of the page.
+    if (!retry) again.focus();
+  }
+
+  document.title = SUBJECT.title;
+  renderMenu();
+})();
+</script>
+</body>
+</html>

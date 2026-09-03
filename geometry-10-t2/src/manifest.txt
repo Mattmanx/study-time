@@ -1,0 +1,10 @@
+# JS modules, in load order: data and pure logic before the views that use them.
+# figures.js must precede views.js -- views.js calls renderFigure.
+checker.js
+problems.js
+generators.js
+figures.js
+hints.js
+storage.js
+session.js
+views.js
