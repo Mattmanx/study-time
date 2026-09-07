@@ -11,6 +11,11 @@ Pick a topic from the landing page. Progress is saved in the browser, so it
 survives closing the tab; a different browser or profile means separate
 progress.
 
+Every page has a **light/dark toggle** in the top-right corner. Until it is
+used the page follows the computer's own setting, and it keeps following it
+live; once a choice is made that choice sticks, on every tool, until it is
+changed again.
+
 ## What's here
 
 | Topic | Grade | Covers |
@@ -141,11 +146,37 @@ generatable by any script that knows the schema; the build inlines it into the
 page. See
 [`shared/vocab/README.md`](shared/vocab/README.md).
 
+## Light and dark
+
+`shared/theme/` is the only place a colour is decided. Every tool loads
+`theme.css` first, which defines `--bg`, `--fg`, `--ok`, `--no` and `--warn`
+for both palettes; no other stylesheet names a colour, only tokens and
+neutrals like `rgba(128,128,128,…)` that read on either. `theme.js` builds the
+toggle button and appends it to `<body>`, so no page carries markup for it.
+
+Light is off-white (`#faf8f5`) rather than pure white, and near-black rather
+than black. Every token clears 4.5:1 against its own background in both
+palettes — the amber tier is `#996300` in light because the obvious `#a26a00`
+measures 4.31:1 there.
+
+Two things about it are worth knowing before changing it:
+
+- **Each `src/app.html` carries a four-line script in its `<head>`.** It has
+  to: `build.py` puts all module JS at the end of `<body>`, so applying a
+  saved theme from `theme.js` alone would flash the other palette on every
+  load — worst for exactly the reader who chose light on a dark machine. The
+  storage key in that script and `THEME_STORAGE_KEY` in `theme.js` must agree.
+- **The `:not([data-theme="light"])` in the `prefers-color-scheme` block is
+  load-bearing.** A media block and an attribute selector have equal
+  specificity and the media block comes first, so without it a reader on a
+  dark OS who picks light gets the dark tokens straight back.
+
 ## How it's built
 
 Source lives in each topic's `src/`. **`index.html` files are generated — edit
 the sources, not them.**
 
+    ./shared/theme/tests/run.sh           # run the theme module's tests
     python3 tools/build.py .              # rebuild the landing page
     python3 tools/build.py geometry-10    # rebuild the geometry tool
     cd geometry-10 && ./tests/run.sh      # run the unit tests
@@ -228,6 +259,9 @@ fails the build instead of reaching a student.
   generated problem the first time one is missed, and `generate()` throws on a
   type it does not know — a missing entry is a crash mid-session, not a gap.
   `generators.test.js` checks this.
+- **Colours live in `shared/theme/theme.css` and nowhere else.** If a
+  stylesheet needs a colour it takes a token. `grep -nE '#[0-9a-fA-F]{3}'`
+  over the other stylesheets should stay empty.
 - **Vocabulary quizzes share one engine.** `shared/vocab/` holds the whole
   thing; a subject is a `src/words.json` data file plus three lines of
   plumbing, and the build inlines the JSON into the page. Read

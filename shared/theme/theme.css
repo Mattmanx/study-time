@@ -1,0 +1,84 @@
+/* The one place any colour is decided. Every tool loads this first, then its
+   own stylesheet, which uses the tokens below and never names a colour.
+
+   Before this file existed no stylesheet set a background or a foreground at
+   all: they declared `color-scheme: light dark` and let the browser paint,
+   so the page was dark purely because the reader's OS was. That works until
+   someone wants to choose, which is what theme.js is for.
+
+   Three blocks, in this order, and the order is the whole trick:
+     1. light on bare :root          -- the default palette
+     2. dark under prefers-color-scheme, EXCEPT when light was chosen
+     3. dark and light under [data-theme]  -- an explicit choice wins
+   Without the :not() in 2, a reader on a dark OS who picks light gets the
+   dark tokens back, because a media block and an attribute selector have the
+   same specificity and the media block comes first. */
+
+:root {
+  color-scheme: light;
+  --bg: #faf8f5;      /* off-white: white at full blast is its own glare */
+  --fg: #1a1a1a;
+  --ok: #1a7f37;
+  --no: #b3261e;
+  --warn: #996300;   /* #a26a00 measures 4.31:1 here, under AA */
+}
+
+/* The green and red above sit under 4.5:1 on a dark canvas, and those tokens
+   colour the verdict a student reads right after a miss. The dark palette
+   lifts them rather than reusing the light values. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #16181c;
+    --fg: #e9eaec;
+    --ok: #3fb950;
+    --no: #f85149;
+    --warn: #d29922;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #16181c;
+  --fg: #e9eaec;
+  --ok: #3fb950;
+  --no: #f85149;
+  --warn: #d29922;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #faf8f5;
+  --fg: #1a1a1a;
+  --ok: #1a7f37;
+  --no: #b3261e;
+  --warn: #996300;
+}
+
+body { background: var(--bg); color: var(--fg); }
+
+/* The toggle. theme.js builds this button and appends it to <body>, so no
+   page needs markup for it. Fixed rather than in the flow because the five
+   pages lay their headers out differently and there is no shared header. */
+.theme-toggle {
+  position: fixed; top: .6rem; right: .6rem; z-index: 10;
+  display: flex; align-items: center; gap: .4rem;
+  font: inherit; font-size: .8rem; line-height: 1;
+  padding: .45rem .7rem; border-radius: 2rem;
+  background: var(--bg); color: inherit;
+  border: 1px solid currentColor; opacity: .55; cursor: pointer;
+}
+.theme-toggle:hover, .theme-toggle:focus-visible { opacity: 1; }
+.theme-toggle svg { width: 1em; height: 1em; fill: none;
+                    stroke: currentColor; stroke-width: 2;
+                    stroke-linecap: round; stroke-linejoin: round; }
+
+/* Narrow screens: the tools are read on a tablet, where a pill in the corner
+   can sit on top of the crumb link. Shrink to the icon alone. */
+@media (max-width: 30rem) {
+  .theme-toggle span { position: absolute; width: 1px; height: 1px;
+                       overflow: hidden; clip-path: inset(50%); }
+  .theme-toggle { padding: .45rem; }
+}
+
+@media print { .theme-toggle { display: none; } }
