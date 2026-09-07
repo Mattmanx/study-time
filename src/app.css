@@ -1,4 +1,7 @@
-:root { color-scheme: light dark; }
+/* Colours live in shared/theme/theme.css, which loads first and defines
+   --bg, --fg, --ok, --no and --warn for both themes. Nothing in this
+   file should name a colour: use a token, or a neutral like
+   rgba(128,128,128,...) that reads on either palette. */
 body {
   font: 16px/1.5 system-ui, -apple-system, sans-serif;
   max-width: 42rem; margin: 0 auto; padding: 2rem 1.25rem;

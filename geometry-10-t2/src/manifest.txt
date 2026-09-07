@@ -1,5 +1,7 @@
-# JS modules, in load order: data and pure logic before the views that use them.
+# JS modules, in load order: the shared theme toggle, then data and
+# pure logic, then the views that use them: data and pure logic before the views that use them.
 # figures.js must precede views.js -- views.js calls renderFigure.
+../../shared/theme/theme.js
 checker.js
 problems.js
 generators.js
