@@ -1,9 +1,7 @@
-:root { color-scheme: light dark; --ok: #1a7f37; --no: #b3261e; --warn: #a26a00; }
-/* The light values fall under 4.5:1 on a dark canvas, and these tokens colour
-   the verdict line — exactly what a student reads after a miss. */
-@media (prefers-color-scheme: dark) {
-  :root { --ok: #3fb950; --no: #f85149; --warn: #d29922; }
-}
+/* Colours live in shared/theme/theme.css, which loads first and defines
+   --bg, --fg, --ok, --no and --warn for both themes. Nothing in this
+   file should name a colour: use a token, or a neutral like
+   rgba(128,128,128,...) that reads on either palette. */
 body {
   font: 16px/1.6 system-ui, -apple-system, sans-serif;
   max-width: 40rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem;
@@ -44,10 +42,12 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
 .options button.wrong {
   border-color: var(--no); color: var(--no); opacity: 1;
   background: rgba(179,38,30,.08);
+  background: color-mix(in srgb, var(--no) 10%, transparent);
 }
 .options button.right {
   border-color: var(--ok); color: var(--ok); font-weight: 600;
   background: rgba(26,127,55,.08);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
 }
 .options button.faded:disabled { opacity: .4; }
 #feedback { min-height: 3.5rem; margin: 1rem 0 .5rem; }

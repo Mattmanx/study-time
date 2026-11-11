@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Study Time</title>
+<!-- Applies a saved theme before first paint. This cannot live in the
+     manifest: build.py puts all module JS at the end of <body>, and setting
+     the theme there means every load flashes the other palette first --
+     which is worst for exactly the reader who chose light on a dark OS.
+     The key must match THEME_STORAGE_KEY in shared/theme/theme.js. -->
+<script>try{var t=localStorage.getItem('study-time.theme');
+if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 <style>{{CSS}}</style>
 </head>
 <body>

@@ -1,0 +1,5 @@
+# Stylesheets, in order. Paths are relative to this src/ directory.
+# theme.css comes first: it defines the palette tokens (--bg, --fg, --ok,
+# --no, --warn) that app.css then uses without naming a colour of its own.
+../../shared/theme/theme.css
+app.css

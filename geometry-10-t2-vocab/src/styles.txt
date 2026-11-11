@@ -1,2 +1,4 @@
 # Stylesheets, in order. Paths are relative to this src/ directory.
+# theme.css defines the palette tokens; vocab.css uses them.
+../../shared/theme/theme.css
 ../../shared/vocab/vocab.css

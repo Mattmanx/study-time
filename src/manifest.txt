@@ -1,1 +1,3 @@
-# No JS: the landing page is static links.
+# The landing page's only JS is the shared light/dark toggle. Path is
+# relative to this src/ directory, so ../ reaches the repository root.
+../shared/theme/theme.js

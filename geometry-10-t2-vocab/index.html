@@ -4,12 +4,102 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Geometry — Test #2: Vocabulary</title>
-<style>:root { color-scheme: light dark; --ok: #1a7f37; --no: #b3261e; --warn: #a26a00; }
-/* The light values fall under 4.5:1 on a dark canvas, and these tokens colour
-   the verdict line — exactly what a student reads after a miss. */
-@media (prefers-color-scheme: dark) {
-  :root { --ok: #3fb950; --no: #f85149; --warn: #d29922; }
+<!-- Applies a saved theme before first paint. This cannot live in the
+     manifest: build.py puts all module JS at the end of <body>, and setting
+     the theme there means every load flashes the other palette first --
+     which is worst for exactly the reader who chose light on a dark OS.
+     The key must match THEME_STORAGE_KEY in shared/theme/theme.js. -->
+<script>try{var t=localStorage.getItem('study-time.theme');
+if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<style>/* The one place any colour is decided. Every tool loads this first, then its
+   own stylesheet, which uses the tokens below and never names a colour.
+
+   Before this file existed no stylesheet set a background or a foreground at
+   all: they declared `color-scheme: light dark` and let the browser paint,
+   so the page was dark purely because the reader's OS was. That works until
+   someone wants to choose, which is what theme.js is for.
+
+   Three blocks, in this order, and the order is the whole trick:
+     1. light on bare :root          -- the default palette
+     2. dark under prefers-color-scheme, EXCEPT when light was chosen
+     3. dark and light under [data-theme]  -- an explicit choice wins
+   Without the :not() in 2, a reader on a dark OS who picks light gets the
+   dark tokens back, because a media block and an attribute selector have the
+   same specificity and the media block comes first. */
+
+:root {
+  color-scheme: light;
+  --bg: #faf8f5;      /* off-white: white at full blast is its own glare */
+  --fg: #1a1a1a;
+  --ok: #1a7f37;
+  --no: #b3261e;
+  --warn: #996300;   /* #a26a00 measures 4.31:1 here, under AA */
 }
+
+/* The green and red above sit under 4.5:1 on a dark canvas, and those tokens
+   colour the verdict a student reads right after a miss. The dark palette
+   lifts them rather than reusing the light values. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #16181c;
+    --fg: #e9eaec;
+    --ok: #3fb950;
+    --no: #f85149;
+    --warn: #d29922;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #16181c;
+  --fg: #e9eaec;
+  --ok: #3fb950;
+  --no: #f85149;
+  --warn: #d29922;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #faf8f5;
+  --fg: #1a1a1a;
+  --ok: #1a7f37;
+  --no: #b3261e;
+  --warn: #996300;
+}
+
+body { background: var(--bg); color: var(--fg); }
+
+/* The toggle. theme.js builds this button and appends it to <body>, so no
+   page needs markup for it. Fixed rather than in the flow because the five
+   pages lay their headers out differently and there is no shared header. */
+.theme-toggle {
+  position: fixed; top: .6rem; right: .6rem; z-index: 10;
+  display: flex; align-items: center; gap: .4rem;
+  font: inherit; font-size: .8rem; line-height: 1;
+  padding: .45rem .7rem; border-radius: 2rem;
+  background: var(--bg); color: inherit;
+  border: 1px solid currentColor; opacity: .55; cursor: pointer;
+}
+.theme-toggle:hover, .theme-toggle:focus-visible { opacity: 1; }
+.theme-toggle svg { width: 1em; height: 1em; fill: none;
+                    stroke: currentColor; stroke-width: 2;
+                    stroke-linecap: round; stroke-linejoin: round; }
+
+/* Narrow screens: the tools are read on a tablet, where a pill in the corner
+   can sit on top of the crumb link. Shrink to the icon alone. */
+@media (max-width: 30rem) {
+  .theme-toggle span { position: absolute; width: 1px; height: 1px;
+                       overflow: hidden; clip-path: inset(50%); }
+  .theme-toggle { padding: .45rem; }
+}
+
+@media print { .theme-toggle { display: none; } }
+
+/* Colours live in shared/theme/theme.css, which loads first and defines
+   --bg, --fg, --ok, --no and --warn for both themes. Nothing in this
+   file should name a colour: use a token, or a neutral like
+   rgba(128,128,128,...) that reads on either palette. */
 body {
   font: 16px/1.6 system-ui, -apple-system, sans-serif;
   max-width: 40rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem;
@@ -50,10 +140,12 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
 .options button.wrong {
   border-color: var(--no); color: var(--no); opacity: 1;
   background: rgba(179,38,30,.08);
+  background: color-mix(in srgb, var(--no) 10%, transparent);
 }
 .options button.right {
   border-color: var(--ok); color: var(--ok); font-weight: 600;
   background: rgba(26,127,55,.08);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
 }
 .options button.faded:disabled { opacity: .4; }
 #feedback { min-height: 3.5rem; margin: 1rem 0 .5rem; }
@@ -83,7 +175,133 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
 <body>
 <main id="app"></main>
 <p class="crumb"><a href="../geometry-10-t2/index.html">Test #2 problems →</a></p>
-<script>// The quiz engine. Subject-agnostic: it knows only side A and side B of a
+<script>// Light/dark choice, shared by every tool. The palette itself is theme.css;
+// this file only decides which of the two is showing and remembers it.
+//
+// The decision logic is DOM-free and exported, so it runs under jsc like the
+// rest of the repository. Everything that touches the document lives below
+// startTheme(), which is only wired up when there IS a document -- that is
+// what lets the test suite load this file at all.
+(function () {
+  var STORAGE_KEY = 'study-time.theme';
+  var THEMES = { light: 1, dark: 1 };
+
+  // A stored value is whatever survived in someone's browser: an old key, a
+  // hand-edited string, junk from another app on the same origin. Anything
+  // that is not one of the two themes means "no choice recorded".
+  function parseTheme(raw) {
+    return (typeof raw === 'string' && THEMES[raw] === 1) ? raw : null;
+  }
+
+  // No stored choice means follow the operating system, which is what the
+  // tools did before there was a toggle at all.
+  function resolveTheme(stored, systemPrefersDark) {
+    var chosen = parseTheme(stored);
+    if (chosen !== null) return chosen;
+    return systemPrefersDark ? 'dark' : 'light';
+  }
+
+  function nextTheme(current) {
+    return current === 'dark' ? 'light' : 'dark';
+  }
+
+  // What the button should say NEXT -- it names the destination, not the
+  // current state, because "Dark" on a dark page reads as a status label and
+  // people click it expecting nothing to happen.
+  function toggleLabel(current) {
+    return current === 'dark' ? 'Light' : 'Dark';
+  }
+
+  globalThis.parseTheme = parseTheme;
+  globalThis.resolveTheme = resolveTheme;
+  globalThis.nextTheme = nextTheme;
+  globalThis.toggleLabel = toggleLabel;
+  globalThis.THEME_STORAGE_KEY = STORAGE_KEY;
+
+  if (typeof document === 'undefined') return;
+
+  function read() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch (e) { return null; }
+  }
+  function write(theme) {
+    // Private browsing throws on write. A theme that does not persist is a
+    // small annoyance; a page that will not load is not.
+    try { localStorage.setItem(STORAGE_KEY, theme); } catch (e) { /* ignore */ }
+  }
+
+  function systemDark() {
+    return !!(window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+  }
+
+  var SUN = '<circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2' +
+            'M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4' +
+            'M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/>';
+  var MOON = '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/>';
+
+  function icon(next) {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+           (next === 'dark' ? MOON : SUN) + '</svg>';
+  }
+
+  function apply(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+
+  function startTheme() {
+    // The <head> bootstrap has usually applied the stored theme already; this
+    // repeats it so the attribute is right even on a page without one, and so
+    // the current theme is known here without re-reading the DOM.
+    var current = resolveTheme(read(), systemDark());
+    apply(current);
+
+    var button = document.createElement('button');
+    button.className = 'theme-toggle';
+    button.type = 'button';
+
+    function render() {
+      var next = nextTheme(current);
+      button.innerHTML = icon(next) + '<span>' + toggleLabel(current) + '</span>';
+      button.setAttribute('aria-label', 'Switch to ' + next + ' mode');
+      button.title = 'Switch to ' + next + ' mode';
+    }
+
+    button.onclick = function () {
+      current = nextTheme(current);
+      apply(current);
+      write(current);
+      render();
+    };
+
+    render();
+    document.body.appendChild(button);
+
+    // Until a choice is made the page tracks the OS live, so a Mac flipping
+    // to dark at sunset carries the tools with it. After a choice, it does
+    // not -- the choice is the point.
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(prefers-color-scheme: dark)');
+      var onChange = function () {
+        if (parseTheme(read()) !== null) return;
+        current = systemDark() ? 'dark' : 'light';
+        apply(current);
+        render();
+      };
+      if (mq.addEventListener) mq.addEventListener('change', onChange);
+      else if (mq.addListener) mq.addListener(onChange);
+    }
+  }
+
+  globalThis.startTheme = startTheme;
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startTheme);
+  } else {
+    startTheme();
+  }
+})();
+
+// The quiz engine. Subject-agnostic: it knows only side A and side B of a
 // pair, and every label the student reads comes from the subject's config.
 // No DOM. Every draw takes an injected rng so rounds are reproducible in tests.
 (function () {

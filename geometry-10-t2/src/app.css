@@ -1,4 +1,7 @@
-:root { color-scheme: light dark; --ok: #1a7f37; --no: #b3261e; }
+/* Colours live in shared/theme/theme.css, which loads first and defines
+   --bg, --fg, --ok, --no and --warn for both themes. Nothing in this
+   file should name a colour: use a token, or a neutral like
+   rgba(128,128,128,...) that reads on either palette. */
 body {
   font: 16px/1.6 system-ui, -apple-system, sans-serif;
   max-width: 40rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem;
@@ -36,12 +39,18 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em;
 #steps li.active, #steps li.past { opacity: 1; }
 .say { font-size: .9rem; opacity: .75; }
 .line { font-size: 1.25rem; }
-.line input {
+/* The operation blanks in .oprow are inputs too, and they only ever got a
+   width here. Everything else fell through to the browser's default control,
+   which looked close enough on a dark canvas and renders as a white box with
+   an inset border on a light one. Both kinds of blank get the same underline. */
+.line input, .opcell input {
   font: inherit; width: 5rem; padding: .1rem .35rem; text-align: center;
   border: 0; border-bottom: 2px solid currentColor; background: none;
   color: inherit; border-radius: 0;
 }
-.line input:focus { outline: none; border-bottom-color: var(--ok); }
+.line input:focus, .opcell input:focus {
+  outline: none; border-bottom-color: var(--ok);
+}
 .line .filled { color: var(--ok); font-weight: 600; }
 .line .shown { color: var(--no); font-weight: 600; }
 .line .todo { opacity: .4; }
